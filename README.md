@@ -87,7 +87,7 @@ composer.a() # 5
 composer.graphviz()
 ```
 
-![Graph of composer](intro.png)
+![Graph of composer](intro.gv.png)
 
 The composer can then be easily passed around in both the production and notebook environment. It can do much more than this.
 
