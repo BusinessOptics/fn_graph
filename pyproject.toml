@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "fn_compose"
+version = "0.1.0"
+description = "Manage, maintain and reuse complex function graphs without the hassle."
+authors = ["James Saunders <james@businessoptics.biz>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+networkx = "^2.4"
+graphviz = "^0.13.2"
+littleutils = "^0.2.1"
+
+[tool.poetry.dev-dependencies]
+pandas = "^0.25.3"
+black = {version = "^18.3-alpha.0", allows-prereleases = true}
+pytest = "^5.3"
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
