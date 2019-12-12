@@ -1,9 +1,10 @@
 [tool.poetry]
-name = "fn_compose"
+name = "fn_graph"
 version = "0.1.0"
 description = "Manage, maintain and reuse complex function graphs without the hassle."
 authors = ["James Saunders <james@businessoptics.biz>"]
 license = "MIT"
+readme = "READE.md"
 
 [tool.poetry.dependencies]
 python = "^3.7"

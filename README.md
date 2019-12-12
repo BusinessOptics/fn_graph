@@ -1,8 +1,12 @@
-# Fn Compose
+# Fn Graph
 
 Manage, maintain and reuse complex function graphs without the hassle.
 
 ## Installation
+
+```
+pip install fn_graph
+```
 
 ## Outline of the problem
 
@@ -60,10 +64,10 @@ def get_c():
 _Pros:_ This is easy to reference from both the notebook and production\
 _Cons:_ The modeller cannot see the intermediate results and functions cannot be reused.
 
-None of these are great. FnCompose would solve it like this.
+None of these are great. Fn Graph would solve it like this.
 
 ```python
-from fn_compose import Composer
+from fn_graph import Composer
 
 def a():
     return 5
@@ -102,6 +106,18 @@ The composer can then be easily passed around in both the production and noteboo
 
 ## Similar projects
 
-Airflow
-Luigi
-d6tflow
+**Airflow**
+
+Airflow is a task manager. It is used to run a series of generally large tasks in an order that meets their dependencies, potentially over multiple machines. It has a whole scheduling and management apparatus around it. Fn Graph is not trying to do this. Fn Graph is about making complex logic more manageable. You may well want to use Fn Graph inside your airflow tasks.
+
+**d6tflow**
+
+TBD
+
+**Luigi**
+
+TBD
+
+**Tensorflow, or PyTorch, or Scikit-Learn**
+
+TBD
