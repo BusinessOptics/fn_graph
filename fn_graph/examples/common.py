@@ -4,7 +4,7 @@ import random
 from random import choice, random
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.resolve()))
 
 from fn_graph import Composer
 
