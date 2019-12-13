@@ -11,6 +11,10 @@ log = getLogger(__name__)
 
 
 class NullCache:
+    """
+    Performs no caching
+    """
+
     def find_invalid(self, composer, execution_graph):
         return execution_graph.nodes()
 
@@ -31,6 +35,10 @@ class NullCache:
 
 
 class SimpleCache:
+    """
+    Stores results in memory, performs no automatic invalidation.
+    """
+
     def __init__(self):
         self.cache = {}
 
@@ -61,6 +69,17 @@ class SimpleCache:
 
 
 class DevelopmentCache:
+    """
+    Store cache on disk, analyses the coe for changes and performs automatic 
+    invalidation.
+
+    This is only for use during development! DO NOT USE THIS IN PRODUCTION!
+
+    The analysis of code changes is limited, it assumes that all functions are 
+    pure, and tht there have been no important changes in the outside environment, 
+    like a file that has been changed,
+    """
+
     def __init__(self, name, cache_dir):
         self.name = name
 

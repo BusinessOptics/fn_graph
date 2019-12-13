@@ -7,7 +7,7 @@ from inspect import Parameter, signature
 from itertools import groupby
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, List, Dict
 
 import graphviz
 import joblib
@@ -23,12 +23,13 @@ from .caches import DevelopmentCache, SimpleCache, NullCache
 
 log = getLogger(__name__)
 
-# TODO cleverer use of caching - stop unneccesary reads
 
 ComposerTestResult = namedtuple("TestResult", "name passed exception")
 """
 The results of Composer.run_tests()
 """
+
+# TODO cleverer use of caching - stop unnecessary reads
 
 
 class Composer:
@@ -116,7 +117,7 @@ class Composer:
         }
         return self.update(**args_with_names, **kwargs)
 
-    def update_without_suffix(self, suffix, *functions, **kwargs):
+    def update_without_suffix(self, suffix, *functions, **kwargs) -> Composer:
         """
         Given a prefix and a list of (named) functions, this adds the functions
         to the composer but first strips the suffix from their name. This is very
@@ -135,7 +136,7 @@ class Composer:
         }
         return self.update(**args_with_names, **kwargs)
 
-    def update_from(self, *composers: Composer):
+    def update_from(self, *composers: Composer) -> Composer:
         """
         Create a new composer with all the functions from this composer
         as well as the the passed composers.
@@ -148,7 +149,7 @@ class Composer:
         """
         return reduce(lambda x, y: x.update(**y._functions), [self, *composers])
 
-    def update_namespaces(self, **namespaces: Composer):
+    def update_namespaces(self, **namespaces: Composer) -> Composer:
         """
         Given a group of keyword named composers, create a series of functions
         namespaced by the keywords and drawn from the composers' functions.
@@ -174,7 +175,7 @@ class Composer:
             }
         )
 
-    def update_parameters(self, **parameters: Any):
+    def update_parameters(self, **parameters: Any) -> Composer:
         """
         Allows you to pass static parameters to the graph, they will be exposed as callables.
         """
@@ -184,7 +185,7 @@ class Composer:
             **{k: (lambda x: (lambda: x))(v) for k, v in parameters.items()}
         )
 
-    def update_tests(self, **tests):
+    def update_tests(self, **tests) -> Composer:
         """
         Adds tests to the composer. 
         
@@ -237,13 +238,15 @@ class Composer:
         Executes the required parts of the function graph to product results
         for the given outputs.
 
-        :param outputs: list of the names of the functions to calculate
-        :param perform_checks: if true error checks are performed before calculation
-        :param intermediates: if true the results of all functions calculated will be returned
-        :param progress_callback: a callback that is called as the calculation progresses,
-            this be of the form `callback(event_type, details)`
+        Args:
+            outputs: list of the names of the functions to calculate
+            perform_checks: if true error checks are performed before calculation
+            intermediates: if true the results of all functions calculated will be returned
+            progress_callback: a callback that is called as the calculation progresses,\
+                 this be of the form `callback(event_type, details)`
 
-        :rtype: dictionary of results keyed by function name
+        Returns:
+            Dictionary: Dictionary of results keyed by function name
         """
         outputs = ensure_list_if_string(outputs)
 
@@ -288,7 +291,7 @@ class Composer:
         # Number of time a functions results still needs to be accessed
         remaining_usage_counts = Counter(pred for pred, _ in dag.edges())
 
-        log.debug("Startin execution")
+        log.debug("Starting execution")
         for name in execution_order:
 
             fn = self._functions[name]
@@ -333,7 +336,8 @@ class Composer:
         """
         Run all the composer tests.
 
-        This will yield a generator of ComposerTestResults(name, passed, exception).
+        Returns:
+            A generator of ComposerTestResults(name, passed, exception).
         """
 
         all_referenced_functions = [
@@ -430,18 +434,33 @@ class Composer:
             _links={k: v for k, v in self._links.items() if v in function_names},
         )
 
-    def cache(self, backend=None):
-        backend = backend or SimpleCache()
-        return self._copy(_cache=SimpleCache())
+    def cache(self, backend=None) -> Composer:
+        """
+        Create a new composer with a given cache backend.
 
-    def development_cache(self, name, cache_dir=None):
+        By default this is a Simple cache.
+        """
+        backend = backend or SimpleCache()
+        return self._copy(_cache=backend)
+
+    def development_cache(self, name, cache_dir=None) -> Composer:
+        """
+        Create a new composer with a development cache setup
+        """
         return self.cache(DevelopmentCache(name, cache_dir))
 
     def cache_clear(self):
+        """
+        Clear the cache
+        """
         for key in self.dag():
             self._cache.invalidate(self, key)
 
-    def cache_invalidate_from(self, *nodes):
+    def cache_invalidate_from(self, *nodes: List[str]):
+        """
+        Invalidate the cache for all nodes affected (the descendants) by the 
+        given nodes.
+        """
         to_invalidate = set()
         for node in nodes:
             to_invalidate.update(nx.descendants(self.dag(), node))
@@ -451,6 +470,9 @@ class Composer:
             self._cache.invalidate(self, key)
 
     def cache_graphviz(self):
+        """
+        Display a graphviz with the cache invalidated nodes highlighted.
+        """
         return self.graphviz(highlight=self._cache.find_invalid(self, self.dag()))
 
     def graphviz(
