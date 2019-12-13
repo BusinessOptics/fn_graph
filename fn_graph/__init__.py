@@ -5,9 +5,12 @@ from collections import Counter, defaultdict, namedtuple
 from functools import reduce
 from inspect import Parameter, signature
 from itertools import groupby
+from logging import getLogger
+from pathlib import Path
 from typing import Any, Callable
 
 import graphviz
+import joblib
 import networkx as nx
 from littleutils import (
     ensure_list_if_string,
@@ -16,9 +19,11 @@ from littleutils import (
     strip_required_suffix,
 )
 
-# Todo
-# Caching - Cache control - Cache Policies - Cache backends - Cache invalidation - Good notebook workflow
-# Lazy execution?
+from .caches import DevelopmentCache, SimpleCache, NullCache
+
+log = getLogger(__name__)
+
+# TODO cleverer use of caching - stop unneccesary reads
 
 ComposerTestResult = namedtuple("TestResult", "name passed exception")
 """
@@ -43,7 +48,6 @@ class Composer:
         _parameters=None,
         _links=None,
         _cache=None,
-        _use_cache=False,
         _tests=None,
     ):
         # These are namespaced
@@ -51,8 +55,7 @@ class Composer:
         self._links = _links or {}
         self._tests = _tests or defaultdict(list)
 
-        self._cache = _cache or {}
-        self._use_cache = _use_cache
+        self._cache = _cache or NullCache()
         self._parameters = _parameters or {}
 
     def _copy(self, **kwargs):
@@ -62,16 +65,12 @@ class Composer:
                     _functions=self._functions,
                     _links=self._links,
                     _cache=self._cache,
-                    _use_cache=self._use_cache,
                     _parameters=self._parameters,
                     _tests=self._tests,
                 ),
                 **kwargs,
             }
         )
-
-    def cache(self):
-        return self._copy(_use_cache=True)
 
     def update(self, *args: Callable, **kwargs: Callable) -> Composer:
         """
@@ -249,8 +248,8 @@ class Composer:
         outputs = ensure_list_if_string(outputs)
 
         # Cache fast path
-        if set(outputs).issubset(self._cache):
-            return select_keys(self._cache, outputs)
+        # if set(outputs).issubset(self._cache) and not intermediates:
+        #    return select_keys(self._cache, outputs)
 
         if perform_checks:
             for name in outputs:
@@ -274,16 +273,22 @@ class Composer:
 
         # Find execution order
         execution_order = list(nx.topological_sort(dag))
+
         progress_callback(
             "prepare_execution",
             dict(execution_order=execution_order, execution_graph=dag),
         )
+
+        # Prepare the cache if it does any automatic invalidations
+        self._cache.prepare_execution(self, execution_graph=dag)
+
         # Results store
         results = {}
 
         # Number of time a functions results still needs to be accessed
         remaining_usage_counts = Counter(pred for pred, _ in dag.edges())
 
+        log.debug("Startin execution")
         for name in execution_order:
 
             fn = self._functions[name]
@@ -295,16 +300,14 @@ class Composer:
             progress_callback("start_function", dict(fname=name))
             start = time.time()
 
-            if name in self._cache:
-                result = self._cache[name]
+            if self._cache.has(self, name):
+                result = self._cache.get(self, name)
             else:
                 # Calculate the result
                 result = fn(**arguments)
+                self._cache.set(self, name, result)
 
             results[name] = result
-
-            if self._use_cache:
-                self._cache[name] = result
 
             period = time.time() - start
             progress_callback(
@@ -365,7 +368,7 @@ class Composer:
         """
         return self.calculate([output])[output]
 
-    def precache(self, outputs):
+    def precalculate(self, outputs):
         """
         Create a new Composer where the results of the given functions have
         been pre-calculated.
@@ -426,6 +429,29 @@ class Composer:
             },
             _links={k: v for k, v in self._links.items() if v in function_names},
         )
+
+    def cache(self, backend=None):
+        backend = backend or SimpleCache()
+        return self._copy(_cache=SimpleCache())
+
+    def development_cache(self, name, cache_dir=None):
+        return self.cache(DevelopmentCache(name, cache_dir))
+
+    def cache_clear(self):
+        for key in self.dag():
+            self._cache.invalidate(self, key)
+
+    def cache_invalidate_from(self, *nodes):
+        to_invalidate = set()
+        for node in nodes:
+            to_invalidate.update(nx.descendants(self.dag(), node))
+            to_invalidate.add(node)
+
+        for key in to_invalidate:
+            self._cache.invalidate(self, key)
+
+    def cache_graphviz(self):
+        return self.graphviz(highlight=self._cache.find_invalid(self, self.dag()))
 
     def graphviz(
         self, *, hide_parameters=False, flatten=False, highlight=None, filter=None
@@ -565,3 +591,4 @@ class Composer:
                     yield pname, resolved_name
             else:
                 yield pname, resolved_name
+

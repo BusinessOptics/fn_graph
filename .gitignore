@@ -139,3 +139,6 @@ Source.gv
 Source.gv.pdf
 Digraph.gv
 Digraph.gv.pdf
+
+#Fn_graph cache
+.fn_graph_cache

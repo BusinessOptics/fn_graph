@@ -1,10 +1,13 @@
 [tool.poetry]
 name = "fn_graph"
-version = "0.1.0"
+version = "0.1.1"
 description = "Manage, maintain and reuse complex function graphs without the hassle."
 authors = ["James Saunders <james@businessoptics.biz>"]
 license = "MIT"
-readme = "READE.md"
+readme = "README.md"
+documentation="https://fn-graph.readthedocs.io/"
+repository="https://github.com/BusinessOptics/fn_graph"
+homepage="https://github.com/BusinessOptics/fn_graph"
 
 [tool.poetry.dependencies]
 python = "^3.7"
@@ -12,6 +15,7 @@ networkx = "^2.4"
 graphviz = "^0.13.2"
 littleutils = "^0.2.1"
 typing = "^3.7"
+joblib = "^0.14.1"
 
 [tool.poetry.dev-dependencies]
 pandas = "^0.25.3"
