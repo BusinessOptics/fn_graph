@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import time
 from collections import Counter, defaultdict, namedtuple
 from functools import reduce
 from inspect import Parameter, signature
 from itertools import groupby
+from typing import Any, Callable
 
-import networkx as nx
 import graphviz
+import networkx as nx
 from littleutils import (
     ensure_list_if_string,
     select_keys,
@@ -70,16 +73,17 @@ class Composer:
     def cache(self):
         return self._copy(_use_cache=True)
 
-    def update(self, *args, **kwargs):
+    def update(self, *args: Callable, **kwargs: Callable) -> Composer:
         """
         Add functions to the composer.
 
-        Positional arguments use the __name__ of the function as the reference
+        Args:
+            args: Positional arguments use the __name__ of the function as the reference
         in the graph.
-
-        Keyword arguments use the key as the name of the function in the graph.
-
-        Returns a new composer with the functions added.
+            kwargs: Keyword arguments use the key as the name of the function in the graph.
+        
+        Returns:
+            A new composer with the functions added.
         """
         args_with_names = {arg.__name__: arg for arg in args}
         all_args = {**self._functions, **args_with_names, **kwargs}
@@ -92,11 +96,20 @@ class Composer:
 
         return self._copy(_functions=all_args)
 
-    def update_without_prefix(self, prefix, *functions, **kwargs):
+    def update_without_prefix(
+        self, prefix: str, *functions: Callable, **kwargs: Callable
+    ) -> Composer:
         """
         Given a prefix and a list of (named) functions, this adds the functions
         to the composer but first strips the prefix from their name. This is very
         useful to stop name shadowing.
+
+        Args:
+            prefix: The prefix to strip off the function names
+            functions: functions to add while stripping the prefix
+            kwargs: named functions to add
+        Returns:
+            A new composer with the functions added
         """
 
         args_with_names = {
@@ -106,9 +119,16 @@ class Composer:
 
     def update_without_suffix(self, suffix, *functions, **kwargs):
         """
-        Given a suffix and a list of (named) functions, this adds the functions
+        Given a prefix and a list of (named) functions, this adds the functions
         to the composer but first strips the suffix from their name. This is very
         useful to stop name shadowing.
+
+        Args:
+            prefix: The suffix to strip off the function names
+            functions: functions to add while stripping the suffix
+            kwargs: named functions to add
+        Returns:
+            A new composer with the functions added
         """
 
         args_with_names = {
@@ -116,19 +136,30 @@ class Composer:
         }
         return self.update(**args_with_names, **kwargs)
 
-    def update_from(self, *composers):
+    def update_from(self, *composers: Composer):
         """
         Create a new composer with all the functions from this composer
         as well as the the passed composers.
+        
+        Args:
+            composers: The composers to take functions from
 
-        Returns a Composer
+        Returns:
+            A new Composer with all the input composers functions added.
         """
         return reduce(lambda x, y: x.update(**y._functions), [self, *composers])
 
-    def update_namespaces(self, **namespaces):
+    def update_namespaces(self, **namespaces: Composer):
         """
         Given a group of keyword named composers, create a series of functions
         namespaced by the keywords and drawn from the composers' functions.
+
+        Args:
+            namespaces: Composers that will be added at the namespace that corresponds \
+            to the arguments key
+
+        Returns:
+            A new Composer with all the input composers functions added as namespaces.
         """
         return self._copy(
             **{
@@ -144,7 +175,7 @@ class Composer:
             }
         )
 
-    def update_parameters(self, **parameters):
+    def update_parameters(self, **parameters: Any):
         """
         Allows you to pass static parameters to the graph, they will be exposed as callables.
         """
@@ -171,11 +202,11 @@ class Composer:
         Create a symlink between an argument name and a function output. 
         This is a convenience method. For example:
 
-        f.link(my_unknown_argument="my_real_function")
+        `f.link(my_unknown_argument="my_real_function")`
 
         is the same as 
 
-        f.update(my_unknown_argument= lambda my_real_function: my_real_function)
+        `f.update(my_unknown_argument= lambda my_real_function: my_real_function)`
 
         """
         _links = {**self._links, **kwargs}
