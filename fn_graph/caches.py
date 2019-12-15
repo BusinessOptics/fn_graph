@@ -15,13 +15,7 @@ class NullCache:
     Performs no caching
     """
 
-    def find_invalid(self, composer, execution_graph):
-        return execution_graph.nodes()
-
-    def prepare_execution(self, composer, execution_graph):
-        pass
-
-    def has(self, composer, key):
+    def valid(self, composer, key):
         return False
 
     def get(self, composer, key):
@@ -37,25 +31,14 @@ class NullCache:
 class SimpleCache:
     """
     Stores results in memory, performs no automatic invalidation.
+
+    DO NOT USE THIS IN DEVELOPMENT OR A NOTEBOOK!
     """
 
     def __init__(self):
         self.cache = {}
 
-    def find_invalid(self, composer, execution_graph):
-
-        to_invalidate = set()
-        for node in execution_graph.nodes():
-            if not self.has(composer, node):
-                to_invalidate.update(nx.descendants(execution_graph, node))
-                to_invalidate.add(node)
-
-        return to_invalidate
-
-    def prepare_execution(self, composer, execution_graph):
-        pass
-
-    def has(self, composer, key):
+    def valid(self, composer, key):
         return key in self.cache
 
     def get(self, composer, key):
@@ -65,7 +48,8 @@ class SimpleCache:
         self.cache[key] = value
 
     def invalidate(self, composer, key):
-        del self.cache[key]
+        if key in self.cache:
+            del self.cache[key]
 
 
 class DevelopmentCache:
@@ -90,40 +74,7 @@ class DevelopmentCache:
         self.cache_root = self.cache_dir / name
         self.cache_root.mkdir(parents=True, exist_ok=True)
 
-    def find_invalid(self, composer, execution_graph):
-        invalid = []
-        for key in execution_graph.nodes():
-
-            if not self.has(composer, key):
-                invalid.append(key)
-                continue
-
-            current_hash = self._hash_fn(composer, key)
-            with open(self.cache_root / f"{key}.fn.hash", "rb") as f:
-                previous_hash = f.read()
-
-            if current_hash != previous_hash:
-                log.debug(
-                    "Function change detected in development cache '%s' for key '%s'",
-                    self.name,
-                    key,
-                )
-                invalid.append(key)
-
-        to_invalidate = set()
-        for node in invalid:
-            to_invalidate.update(nx.descendants(execution_graph, node))
-            to_invalidate.add(node)
-
-        return to_invalidate
-
-    def prepare_execution(self, composer, execution_graph):
-        log.debug("Preparing cache execution")
-        # Invalidate all the items that have changed, or had ancestors change
-        for key in self.find_invalid(composer, execution_graph):
-            self.invalidate(composer, key)
-
-    def has(self, composer, key):
+    def valid(self, composer, key):
         exists = (self.cache_root / f"{key}.pickle").exists()
         log.debug(
             "Checking development cache '%s' for key '%s': exists = %s",
@@ -131,7 +82,23 @@ class DevelopmentCache:
             key,
             exists,
         )
-        return exists
+
+        if not exists:
+            return False
+
+        current_hash = self._hash_fn(composer, key)
+        with open(self.cache_root / f"{key}.fn.hash", "rb") as f:
+            previous_hash = f.read()
+
+        if current_hash != previous_hash:
+            log.debug(
+                "Function change detected in development cache '%s' for key '%s'",
+                self.name,
+                key,
+            )
+            return False
+
+        return True
 
     def get(self, composer, key):
         log.debug("Retrieving from development cache '%s' for key '%s'", self.name, key)

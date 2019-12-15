@@ -20,6 +20,7 @@ from littleutils import (
 )
 
 from .caches import DevelopmentCache, SimpleCache, NullCache
+from .calculation import calculate
 
 log = getLogger(__name__)
 
@@ -234,103 +235,9 @@ class Composer:
     def calculate(
         self, outputs, perform_checks=True, intermediates=False, progress_callback=None
     ):
-        """
-        Executes the required parts of the function graph to product results
-        for the given outputs.
-
-        Args:
-            outputs: list of the names of the functions to calculate
-            perform_checks: if true error checks are performed before calculation
-            intermediates: if true the results of all functions calculated will be returned
-            progress_callback: a callback that is called as the calculation progresses,\
-                 this be of the form `callback(event_type, details)`
-
-        Returns:
-            Dictionary: Dictionary of results keyed by function name
-        """
-        outputs = ensure_list_if_string(outputs)
-
-        # Cache fast path
-        # if set(outputs).issubset(self._cache) and not intermediates:
-        #    return select_keys(self._cache, outputs)
-
-        if perform_checks:
-            for name in outputs:
-                if name not in self._functions:
-                    raise Exception(
-                        f"'{name}' is not a composed function in this {self.__class__.__name__} object."
-                    )
-
-            for error in self.check():
-                raise Exception(error)
-
-        progress_callback = progress_callback or (lambda *args, **kwargs: None)
-
-        # Limit to only the functions we care about
-        full_dag = self.dag()
-        ancestors = set(outputs) | {
-            pred for output in outputs for pred in nx.ancestors(full_dag, output)
-        }
-
-        dag = full_dag.subgraph(ancestors)
-
-        # Find execution order
-        execution_order = list(nx.topological_sort(dag))
-
-        progress_callback(
-            "prepare_execution",
-            dict(execution_order=execution_order, execution_graph=dag),
+        return calculate(
+            self, outputs, perform_checks, intermediates, progress_callback
         )
-
-        # Prepare the cache if it does any automatic invalidations
-        self._cache.prepare_execution(self, execution_graph=dag)
-
-        # Results store
-        results = {}
-
-        # Number of time a functions results still needs to be accessed
-        remaining_usage_counts = Counter(pred for pred, _ in dag.edges())
-
-        log.debug("Starting execution")
-        for name in execution_order:
-
-            fn = self._functions[name]
-
-            # Pull up arguments
-            predecessors = list(self._resolve_predecessors(name))
-            arguments = {parameter: results[pred] for parameter, pred in predecessors}
-
-            progress_callback("start_function", dict(fname=name))
-            start = time.time()
-
-            if self._cache.has(self, name):
-                result = self._cache.get(self, name)
-            else:
-                # Calculate the result
-                result = fn(**arguments)
-                self._cache.set(self, name, result)
-
-            results[name] = result
-
-            period = time.time() - start
-            progress_callback(
-                "end_function", dict(fname=name, time=period, result=result)
-            )
-
-            # Eject results from memory once the are not needed
-            if not intermediates:
-                remaining_usage_counts.subtract([pred for _, pred in predecessors])
-                ready_to_eject = [
-                    key
-                    for key, value in remaining_usage_counts.items()
-                    if value == 0 and key not in outputs
-                ]
-                for key in ready_to_eject:
-                    remaining_usage_counts.pop(key)
-                    results.pop(key)
-
-        # We should just be left with the results
-        return results
 
     def run_tests(self):
         """
