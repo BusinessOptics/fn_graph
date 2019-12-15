@@ -86,12 +86,8 @@ def calculate(
     progress_callback = progress_callback or (lambda *args, **kwargs: None)
 
     # Limit to only the functions we care about
-    full_dag = composer.dag()
-    ancestors = set(outputs) | {
-        pred for output in outputs for pred in nx.ancestors(full_dag, output)
-    }
+    dag = composer.ancestor_dag(outputs)
 
-    dag = full_dag.subgraph(ancestors)
     if intermediates:
         outputs = dag.nodes()
 

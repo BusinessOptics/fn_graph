@@ -70,7 +70,7 @@ mem_cache = f.cache()
 
 dev_cache = f.development_cache("burger_savings_composer")
 
-dev_cache.cache_invalidate_from("car_prices")
+dev_cache.cache_invalidate("car_prices")
 dev_cache.cache_graphviz()
 
 # Everything should be calculated
@@ -80,7 +80,7 @@ dev_cache.burger_savings()
 dev_cache.burger_savings()
 
 # Invalidate some things
-dev_cache.cache_invalidate_from("car_prices")
+dev_cache.cache_invalidate("car_prices")
 
 # Some things retrieved from cache
 dev_cache.burger_savings()

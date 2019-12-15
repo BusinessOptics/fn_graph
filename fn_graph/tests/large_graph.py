@@ -1,12 +1,4 @@
-#%%
 from fn_graph import Composer
-from textwrap import dedent
-from random import randint, choice
-from functools import reduce
-
-from .utils import compare_composer_results
-
-# Randomly generated graph
 
 
 def function_0():
@@ -181,10 +173,4 @@ def function_41(function_18):
 
 scope = locals()
 functions = [scope[f"function_{i}"] for i in range(42)]
-root = Composer().update(*functions)
-
-
-def test_static_cache_equality():
-    composers = [root, root.cache(), root.development_cache(__name__)]
-    compare_composer_results(root, composers)
-
+large_graph = Composer().update(*functions)

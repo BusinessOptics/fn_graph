@@ -21,6 +21,7 @@ from littleutils import (
 
 from .caches import DevelopmentCache, SimpleCache, NullCache
 from .calculation import calculate
+from fn_graph.calculation import NodeInstruction, get_execution_instructions
 
 log = getLogger(__name__)
 
@@ -328,6 +329,17 @@ class Composer:
 
         return G
 
+    def ancestor_dag(self, outputs):
+        """
+        A dag of all the ancestors of the given outputs, i.e. the functions that must be calculated 
+        to for the given outputs.
+        """
+        full_dag = self.dag()
+        ancestors = set(outputs) | {
+            pred for output in outputs for pred in nx.ancestors(full_dag, output)
+        }
+        return full_dag.subgraph(ancestors)
+
     def subgraph(self, function_names):
         """
         Given a collection of function names this will create a new 
@@ -363,7 +375,7 @@ class Composer:
         for key in self.dag():
             self._cache.invalidate(self, key)
 
-    def cache_invalidate_from(self, *nodes: List[str]):
+    def cache_invalidate(self, *nodes: List[str]):
         """
         Invalidate the cache for all nodes affected (the descendants) by the 
         given nodes.
@@ -376,14 +388,34 @@ class Composer:
         for key in to_invalidate:
             self._cache.invalidate(self, key)
 
-    def cache_graphviz(self):
+    def cache_graphviz(self, outputs=[]):
         """
         Display a graphviz with the cache invalidated nodes highlighted.
         """
-        return self.graphviz(highlight=self._cache.find_invalid(self, self.dag()))
+        instructions = get_execution_instructions(self, self.dag(), outputs)
+
+        filter = self.ancestor_dag(outputs).nodes() if outputs else None
+
+        def get_node_styles(instruction):
+            return {
+                NodeInstruction.IGNORE: dict(fillcolor="green"),
+                NodeInstruction.RETRIEVE: dict(fillcolor="orange"),
+                NodeInstruction.CALCULATE: dict(fillcolor="red"),
+            }[instruction]
+
+        extra_node_styles = {
+            node: get_node_styles(instruction) for node, instruction in instructions
+        }
+        return self.graphviz(extra_node_styles=extra_node_styles, filter=filter)
 
     def graphviz(
-        self, *, hide_parameters=False, flatten=False, highlight=None, filter=None
+        self,
+        *,
+        hide_parameters=False,
+        flatten=False,
+        highlight=None,
+        filter=None,
+        extra_node_styles=None,
     ):
         """
         Generates a graphviz.DiGraph that is suitable for display.
@@ -392,7 +424,7 @@ class Composer:
 
         The output can be directly viewed in a Jupyter notebook.
         """
-
+        extra_node_styles = extra_node_styles or {}
         highlight = highlight or []
         dag = self.dag()
 
@@ -402,6 +434,7 @@ class Composer:
         tree = self._build_name_tree()
 
         unbound = set(self._unbound().keys())
+
         # Recursively build from the tree
         def create_subgraph(tree, name=None):
 
@@ -421,6 +454,10 @@ class Composer:
                     if hide_parameters and name in self._parameters:
                         continue
 
+                    node_styles = dict(
+                        style="rounded, filled", fontname="arial", shape="rect"
+                    )
+
                     if name in highlight:
                         color = "#7dc242"
                     elif name in unbound:
@@ -430,20 +467,18 @@ class Composer:
                     else:
                         color = ""
 
+                    if color:
+                        node_styles.update(fillcolor=color)
+
+                    node_styles.update(extra_node_styles.get(v, {}))
+
                     if flatten:
                         label = name.replace("_", "\n")
                     else:
                         label = k.replace("_", "\n")
 
                     if name in filter:
-                        g.node(
-                            name,
-                            label=label,
-                            fillcolor=color,
-                            style="rounded, filled",
-                            fontname="arial",
-                            shape="rect",
-                        )
+                        g.node(name, label=label, **node_styles)
                 else:
                     g.subgraph(create_subgraph(v, k))
             return g
