@@ -43,7 +43,7 @@ def calculated_factor(data):
 factor_calc = Composer()
 factoring = Composer().update(calculated_factor)
 
-parent = (
+linked_parent = (
     Composer()
     .update_namespaces(child_one=child, factoring=factoring)
     .update(data)
