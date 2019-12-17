@@ -101,11 +101,10 @@ The composer can then be easily passed around in both the production and noteboo
 - Manage calculation life cycle, with hooks, and have access to all intermediary calculations.
 - Cache results, either within a single session, or between sessions in development mode. Using the development cache intelligently invalidate the cache when code changes .
 
-## FnCompose Studio
-
 ## Similar projects
 
 **Dask**
+
 Dask is a light-weight parallel computing library. Importantly it has a Pandas compliant interface. You may want to use Dask inside FnGraph.
 
 **Airflow**
