@@ -99,25 +99,25 @@ The composer can then be easily passed around in both the production and noteboo
 - Visualize logic to make knowledge sharing easier.
 - Perform graph operations on composers to dynamically rewire your logic
 - Manage calculation life cycle, with hooks, and have access to all intermediary calculations.
+- Cache results, either within a single session, or between sessions in development mode. Using the development cache intelligently invalidate the cache when code changes .
 
-**Coming soon:**
-
-- Intelligent Caching
+## FnCompose Studio
 
 ## Similar projects
 
+**Dask**
+Dask is a light-weight parallel computing library. Importantly it has a Pandas compliant interface. You may want to use Dask inside FnGraph.
+
 **Airflow**
 
-Airflow is a task manager. It is used to run a series of generally large tasks in an order that meets their dependencies, potentially over multiple machines. It has a whole scheduling and management apparatus around it. Fn Graph is not trying to do this. Fn Graph is about making complex logic more manageable. You may well want to use Fn Graph inside your airflow tasks.
-
-**d6tflow**
-
-TBD
+Airflow is a task manager. It is used to run a series of generally large tasks in an order that meets their dependencies, potentially over multiple machines. It has a whole scheduling and management apparatus around it. Fn Graph is not trying to do this. Fn Graph is about making complex logic more manageable, and easier to move between development and production. You may well want to use Fn Graph inside your airflow tasks.
 
 **Luigi**
 
-TBD
+> Luigi is a Python module that helps you build complex pipelines of batch jobs. It handles dependency resolution, workflow management, visualization etc. It also comes with Hadoop support built in.
 
-**Tensorflow, or PyTorch, or Scikit-Learn**
+Luigi is about big batch jobs, and managing the distribution and scheduling of them. In the same way that airflow works ate a higher level to FnGraph, so does luigi.
 
-TBD
+**d6tflow**
+
+d6tflow is very similar to FnGraph. It is based on Luigi. The primary difference is the way the function graphs are composed. d6tflow graphs can be very difficult to reuse (but do have some greater flexibility). It also allows for parallel execution. FnGraph is trying to make very complex pipelines or very complex models easier to mange, build, and productionise.

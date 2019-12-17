@@ -54,6 +54,25 @@ def get_execution_instructions(composer, dag, outputs):
     return execution_instructions
 
 
+def maintain_cache_consistency(composer):
+    dag = composer.dag()
+
+    direct_invalid_nodes = {
+        node for node in dag if not composer._cache.valid(composer, node)
+    }
+
+    # If a node is invalidate all it's descendents must be made invalid
+    indirect_invalid_nodes = (
+        reduce(
+            lambda a, b: a | b,
+            [nx.descendants(dag, node) for node in direct_invalid_nodes] + [set()],
+        )
+    ) - direct_invalid_nodes
+
+    for node in indirect_invalid_nodes:
+        composer._cache.invalidate(composer, node)
+
+
 def calculate(
     composer, outputs, perform_checks=True, intermediates=False, progress_callback=None
 ):
@@ -84,6 +103,8 @@ def calculate(
             raise Exception(error)
 
     progress_callback = progress_callback or (lambda *args, **kwargs: None)
+
+    maintain_cache_consistency(composer)
 
     # Limit to only the functions we care about
     dag = composer.ancestor_dag(outputs)

@@ -465,7 +465,7 @@ class Composer:
                     elif name in self._parameters:
                         color = "lightblue"
                     else:
-                        color = ""
+                        color = "lightgrey"
 
                     if color:
                         node_styles.update(fillcolor=color)

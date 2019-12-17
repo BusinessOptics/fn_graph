@@ -122,6 +122,17 @@ class DevelopmentCache:
             if path.exists():
                 path.unlink()
 
+    def _fn_value(self, composer, key):
+        value = (
+            composer._parameters[key]
+            if key in composer._parameters
+            else composer._functions[key]
+        )
+        if callable(value):
+            return inspect.getsource(value)
+        else:
+            return str(value)
+
     def _hash_fn(self, composer, key):
         value = (
             composer._parameters[key]
