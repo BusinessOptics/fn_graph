@@ -5,14 +5,14 @@ from io import BytesIO
 from logging import getLogger
 from pathlib import Path
 
-import networkx as nx
-
 log = getLogger(__name__)
 
 
 class NullCache:
     """
-    Performs no caching
+    Performs no caching.
+
+    Used as a base class for other caches to indicate that they all have the same signature.
     """
 
     def valid(self, composer, key):
@@ -28,7 +28,7 @@ class NullCache:
         pass
 
 
-class SimpleCache:
+class SimpleCache(NullCache):
     """
     Stores results in memory, performs no automatic invalidation.
 
@@ -52,15 +52,15 @@ class SimpleCache:
             del self.cache[key]
 
 
-class DevelopmentCache:
+class DevelopmentCache(NullCache):
     """
-    Store cache on disk, analyses the coe for changes and performs automatic 
+    Store cache on disk, analyses the coe for changes and performs automatic
     invalidation.
 
     This is only for use during development! DO NOT USE THIS IN PRODUCTION!
 
-    The analysis of code changes is limited, it assumes that all functions are 
-    pure, and tht there have been no important changes in the outside environment, 
+    The analysis of code changes is limited, it assumes that all functions are
+    pure, and tht there have been no important changes in the outside environment,
     like a file that has been changed,
     """
 

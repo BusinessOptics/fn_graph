@@ -1,12 +1,11 @@
+import time
+from collections import Counter
 from enum import Enum
 from functools import reduce
+from logging import getLogger
+
 import networkx as nx
 from littleutils import ensure_list_if_string
-from collections import Counter
-from logging import getLogger
-import time
-
-from littleutils import select_keys
 
 log = getLogger(__name__)
 
@@ -129,7 +128,7 @@ def calculate(
     for node, instruction in execution_instructions:
         start = time.time()
         progress_callback(
-            "start_function", dict(name=name, execution_instruction=instruction)
+            "start_function", dict(name=node, execution_instruction=instruction)
         )
         predecessors = list(composer._resolve_predecessors(node))
 
@@ -166,7 +165,7 @@ def calculate(
         progress_callback(
             "end_function",
             dict(
-                name=name,
+                name=node,
                 execution_instruction=instruction,
                 time=period,
                 result=results.get(node),
@@ -175,4 +174,3 @@ def calculate(
 
     # We should just be left with the results
     return results
-    return select_keys(results, outputs)

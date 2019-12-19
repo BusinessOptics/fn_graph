@@ -1,27 +1,22 @@
 from __future__ import annotations
 
-import time
-from collections import Counter, defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from functools import reduce
 from inspect import Parameter, signature
 from itertools import groupby
 from logging import getLogger
-from pathlib import Path
-from typing import Any, Callable, List, Dict
+from typing import Any, Callable, List
 
 import graphviz
-import joblib
 import networkx as nx
 from littleutils import (
-    ensure_list_if_string,
-    select_keys,
     strip_required_prefix,
     strip_required_suffix,
 )
 
+from fn_graph.calculation import NodeInstruction, get_execution_instructions
 from .caches import DevelopmentCache, SimpleCache, NullCache
 from .calculation import calculate
-from fn_graph.calculation import NodeInstruction, get_execution_instructions
 
 log = getLogger(__name__)
 
@@ -56,7 +51,7 @@ class Composer:
         # These are namespaced
         self._functions = _functions or {}
         self._links = _links or {}
-        self._tests = _tests or defaultdict(list)
+        self._tests = _tests or {}
 
         self._cache = _cache or NullCache()
         self._parameters = _parameters or {}
@@ -83,7 +78,7 @@ class Composer:
             args: Positional arguments use the __name__ of the function as the reference
         in the graph.
             kwargs: Keyword arguments use the key as the name of the function in the graph.
-        
+
         Returns:
             A new composer with the functions added.
         """
@@ -121,12 +116,12 @@ class Composer:
 
     def update_without_suffix(self, suffix, *functions, **kwargs) -> Composer:
         """
-        Given a prefix and a list of (named) functions, this adds the functions
+        Given a suffix and a list of (named) functions, this adds the functions
         to the composer but first strips the suffix from their name. This is very
         useful to stop name shadowing.
 
         Args:
-            prefix: The suffix to strip off the function names
+            suffix: The suffix to strip off the function names
             functions: functions to add while stripping the suffix
             kwargs: named functions to add
         Returns:
@@ -142,7 +137,7 @@ class Composer:
         """
         Create a new composer with all the functions from this composer
         as well as the the passed composers.
-        
+
         Args:
             composers: The composers to take functions from
 
@@ -189,24 +184,24 @@ class Composer:
 
     def update_tests(self, **tests) -> Composer:
         """
-        Adds tests to the composer. 
-        
-        A test is a function that should check a property of the calculations 
+        Adds tests to the composer.
+
+        A test is a function that should check a property of the calculations
         results and raise an exception if they are not met.
 
-        The work exactly the same way as functions in terms of resolution of 
+        The work exactly the same way as functions in terms of resolution of
         arguments. They are run with the run_test method.
         """
         return self._copy(_tests={**self._tests, **tests})
 
     def link(self, **kwargs):
         """
-        Create a symlink between an argument name and a function output. 
+        Create a symlink between an argument name and a function output.
         This is a convenience method. For example:
 
         `f.link(my_unknown_argument="my_real_function")`
 
-        is the same as 
+        is the same as
 
         `f.update(my_unknown_argument= lambda my_real_function: my_real_function)`
 
@@ -256,7 +251,6 @@ class Composer:
 
         results = self.calculate(all_referenced_functions)
 
-        test_results = []
         for tname, fn in self._tests.items():
 
             arguments = {
@@ -331,7 +325,7 @@ class Composer:
 
     def ancestor_dag(self, outputs):
         """
-        A dag of all the ancestors of the given outputs, i.e. the functions that must be calculated 
+        A dag of all the ancestors of the given outputs, i.e. the functions that must be calculated
         to for the given outputs.
         """
         full_dag = self.dag()
@@ -342,7 +336,7 @@ class Composer:
 
     def subgraph(self, function_names):
         """
-        Given a collection of function names this will create a new 
+        Given a collection of function names this will create a new
         composer that only consists of those nodes.
         """
         return self._copy(
@@ -377,7 +371,7 @@ class Composer:
 
     def cache_invalidate(self, *nodes: List[str]):
         """
-        Invalidate the cache for all nodes affected (the descendants) by the 
+        Invalidate the cache for all nodes affected (the descendants) by the
         given nodes.
         """
         to_invalidate = set()
@@ -388,7 +382,7 @@ class Composer:
         for key in to_invalidate:
             self._cache.invalidate(self, key)
 
-    def cache_graphviz(self, outputs=[]):
+    def cache_graphviz(self, outputs=()):
         """
         Display a graphviz with the cache invalidated nodes highlighted.
         """
@@ -430,8 +424,6 @@ class Composer:
 
         if filter is None:
             filter = dag.nodes()
-
-        tree = self._build_name_tree()
 
         unbound = set(self._unbound().keys())
 
@@ -483,16 +475,16 @@ class Composer:
                     g.subgraph(create_subgraph(v, k))
             return g
 
-        g = create_subgraph(tree)
-        g.attr("graph", rankdir="BT")
+        result = create_subgraph(self._build_name_tree())
+        result.attr("graph", rankdir="BT")
         for node in self.dag().nodes():
             for _, pred in self._resolve_predecessors(node):
                 if (not hide_parameters or pred not in self._parameters) and (
                     pred in filter and node in filter
                 ):
-                    g.edge(pred, node)
+                    result.edge(pred, node)
 
-        return g
+        return result
 
     def _build_name_tree(self):
         # Build up a tree of the subgraphs
@@ -555,4 +547,3 @@ class Composer:
                     yield pname, resolved_name
             else:
                 yield pname, resolved_name
-
