@@ -144,7 +144,14 @@ class Composer:
         Returns:
             A new Composer with all the input composers functions added.
         """
-        return reduce(lambda x, y: x.update(**y._functions), [self, *composers])
+        return reduce(
+            lambda x, y: x
+                .update(**y._functions)
+                .link(**y._links)
+                .update_parameters(**y._parameters)
+                .update_tests(**y._tests),
+            [self, *composers],
+        )
 
     def update_namespaces(self, **namespaces: Composer) -> Composer:
         """
