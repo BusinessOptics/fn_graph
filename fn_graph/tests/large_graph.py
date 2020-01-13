@@ -33,12 +33,14 @@ def function_7(function_2, function_3, function_5, function_6):
     return function_3 + function_2 + function_6 + function_5
 
 
-def function_8(function_7):
-    return function_7
+# making these links
+
+# def function_8(function_7):
+#     return function_7
 
 
-def function_9(function_5):
-    return function_5
+# def function_9(function_5):
+#     return function_5
 
 
 def function_10(function_1, function_3, function_6, function_7, function_9):
@@ -172,5 +174,7 @@ def function_41(function_18):
 #%%
 
 scope = locals()
-functions = [scope[f"function_{i}"] for i in range(42)]
-large_graph = Composer().update(*functions)
+functions = [scope[f"function_{i}"] for i in range(42) if f"function_{i}" in scope]
+large_graph = (
+    Composer().update(*functions).link(function_8="function_7", function_9="function_5")
+)
