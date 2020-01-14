@@ -323,7 +323,7 @@ class Composer:
 
     def ancestor_dag(self, outputs):
         """
-        A dag of all theShould have some default date range anchored around the current date (e.g. from current date minus 6 months or 1 year to current date) ancestors of the given outputs, i.e. the functions that must be calculated
+        A dag of all the ancestors of the given outputs, i.e. the functions that must be calculated
         to for the given outputs.
         """
         full_dag = self.dag()
