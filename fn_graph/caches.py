@@ -122,16 +122,11 @@ class DevelopmentCache(NullCache):
             if path.exists():
                 path.unlink()
 
-    def _fn_value(self, composer, key):
-        value = (
-            composer._parameters[key]
-            if key in composer._parameters
-            else composer._functions[key]
-        )
-        if callable(value):
-            return inspect.getsource(value)
+    def _fn_value(self, fn):
+        if getattr(fn, "_is_fn_graph_link", False):
+            return ",".join(inspect.signature(fn).parameters.keys())
         else:
-            return str(value)
+            return inspect.getsource(fn)
 
     def _hash_fn(self, composer, key):
         value = (
@@ -141,7 +136,7 @@ class DevelopmentCache(NullCache):
         )
 
         if callable(value):
-            buffer = inspect.getsource(value).encode("utf-8")
+            buffer = self._fn_value(value).encode("utf-8")
             return hashlib.sha256(buffer).digest()
         else:
             buffer = BytesIO()

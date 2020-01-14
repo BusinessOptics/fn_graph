@@ -9,10 +9,7 @@ from typing import Any, Callable, List
 
 import graphviz
 import networkx as nx
-from littleutils import (
-    strip_required_prefix,
-    strip_required_suffix,
-)
+from littleutils import strip_required_prefix, strip_required_suffix
 
 from fn_graph.calculation import NodeInstruction, get_execution_instructions
 from .caches import DevelopmentCache, SimpleCache, NullCache
@@ -39,18 +36,9 @@ class Composer:
     a directed acyclic graph.
     """
 
-    def __init__(
-        self,
-        *,
-        _functions=None,
-        _parameters=None,
-        _links=None,
-        _cache=None,
-        _tests=None,
-    ):
+    def __init__(self, *, _functions=None, _parameters=None, _cache=None, _tests=None):
         # These are namespaced
         self._functions = _functions or {}
-        self._links = _links or {}
         self._tests = _tests or {}
 
         self._cache = _cache or NullCache()
@@ -61,7 +49,6 @@ class Composer:
             **{
                 **dict(
                     _functions=self._functions,
-                    _links=self._links,
                     _cache=self._cache,
                     _parameters=self._parameters,
                     _tests=self._tests,
@@ -145,11 +132,9 @@ class Composer:
             A new Composer with all the input composers functions added.
         """
         return reduce(
-            lambda x, y: x
-                .update(**y._functions)
-                .link(**y._links)
-                .update_parameters(**y._parameters)
-                .update_tests(**y._tests),
+            lambda x, y: x.update(**y._functions)
+            .update_parameters(**y._parameters)
+            .update_tests(**y._tests),
             [self, *composers],
         )
 
@@ -175,7 +160,7 @@ class Composer:
                         for k, value in getattr(composer, arg).items()
                     },
                 }
-                for arg in ["_functions", "_links", "_parameters"]
+                for arg in ["_functions", "_parameters"]
             }
         )
 
@@ -213,8 +198,14 @@ class Composer:
         `f.update(my_unknown_argument= lambda my_real_function: my_real_function)`
 
         """
-        _links = {**self._links, **kwargs}
-        return self._copy(_links=_links)
+
+        def make_link_fn(source):
+            fn = eval(f"lambda {source}: {source}")
+            fn._is_fn_graph_link = True
+            return fn
+
+        fns = {key: make_link_fn(source) for key, source in kwargs.items()}
+        return self.update(**fns)
 
     def check(self):
         """
@@ -308,9 +299,9 @@ class Composer:
 
     def raw_function(self, name):
         """
-        Access a raw function in the composer by name.
+        Access a raw function in the composer by name. Returns None if not found.
         """
-        return self._functions[name]
+        return self._functions.get(name)
 
     def dag(self):
         """
@@ -351,7 +342,6 @@ class Composer:
             _parameters={
                 k: v for k, v in self._parameters.items() if k in function_names
             },
-            _links={k: v for k, v in self._links.items() if v in function_names},
         )
 
     def cache(self, backend=None) -> Composer:
@@ -378,8 +368,8 @@ class Composer:
 
     def cache_invalidate(self, *nodes: List[str]):
         """
-        Invalidate the cache for all nodes affected (the descendants) by the
-        given nodes.
+        Invalidate the cache for all nodes affected  by the
+        given nodes (the descendants).
         """
         to_invalidate = set()
         for node in nodes:
@@ -389,7 +379,7 @@ class Composer:
         for key in to_invalidate:
             self._cache.invalidate(self, key)
 
-    def cache_graphviz(self, outputs=()):
+    def cache_graphviz(self, outputs=(), **kwargs):
         """
         Display a graphviz with the cache invalidated nodes highlighted.
         """
@@ -404,15 +394,21 @@ class Composer:
                 NodeInstruction.CALCULATE: dict(fillcolor="red"),
             }[instruction]
 
+        # TODO: Be a bit more careful about people passing in conflicting params
+
         extra_node_styles = {
             node: get_node_styles(instruction) for node, instruction in instructions
         }
-        return self.graphviz(extra_node_styles=extra_node_styles, filter=filter)
+
+        return self.graphviz(
+            extra_node_styles=extra_node_styles, filter=filter, **kwargs
+        )
 
     def graphviz(
         self,
         *,
         hide_parameters=False,
+        expand_links=False,
         flatten=False,
         highlight=None,
         filter=None,
@@ -445,17 +441,20 @@ class Composer:
 
             g = graphviz.Digraph(name=name)
             if label:
-                g.attr("graph", label=label, fontname="arial")
+                g.attr("graph", label=label, fontname="arial", title="")
 
             for k, v in tree.items():
                 if isinstance(v, str):
                     name = v
+                    fn = self.raw_function(name)
+
                     if hide_parameters and name in self._parameters:
                         continue
 
                     node_styles = dict(
                         style="rounded, filled", fontname="arial", shape="rect"
                     )
+                    is_link = fn and getattr(fn, "_is_fn_graph_link", False)
 
                     if name in highlight:
                         color = "#7dc242"
@@ -463,15 +462,24 @@ class Composer:
                         color = "red"
                     elif name in self._parameters:
                         color = "lightblue"
+
                     else:
                         color = "lightgrey"
 
-                    if color:
-                        node_styles.update(fillcolor=color)
+                    node_styles.update(dict(fillcolor=color))
+
+                    if is_link and expand_links:
+                        node_styles.update(dict(fontcolor="darkgrey"))
+                    elif is_link:
+                        node_styles.update(
+                            dict(shape="circle", height="0.2", width="0.2")
+                        )
 
                     node_styles.update(extra_node_styles.get(v, {}))
 
-                    if flatten:
+                    if is_link and not expand_links:
+                        label = ""
+                    elif flatten:
                         label = name.replace("_", "\n")
                     else:
                         label = k.replace("_", "\n")
@@ -533,9 +541,6 @@ class Composer:
         ]
         possible_preds.reverse()
         for possible in possible_preds:
-            if possible in self._links:
-                return self._links[possible]
-
             if possible in self._functions:
                 return possible
         else:
