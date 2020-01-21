@@ -1,6 +1,6 @@
 # Fn Graph
 
-Manage, maintain and reuse complex function graphs without the hassle.
+Light weight function pipelines for python. 
 
 ## Installation
 
