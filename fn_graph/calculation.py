@@ -2,6 +2,7 @@ import time
 from collections import Counter
 from enum import Enum
 from functools import reduce
+from inspect import Parameter, signature
 from logging import getLogger
 
 import networkx as nx
@@ -72,6 +73,55 @@ def maintain_cache_consistency(composer):
         composer._cache.invalidate(composer, node)
 
 
+def coalesce_argument_names(function):
+    sig = signature(function)
+
+    positional_names = []
+    args_name = None
+    keyword_names = []
+    kwargs_name = None
+
+    for key, parameter in sig.parameters.items():
+        if parameter.kind in (
+            parameter.KEYWORD_ONLY,
+            parameter.POSITIONAL_OR_KEYWORD,
+            parameter.POSITIONAL_ONLY,
+        ):
+            if args_name is None:
+                positional_names.append(key)
+            else:
+                keyword_names.append(key)
+        elif parameter.kind == parameter.VAR_POSITIONAL:
+            args_name = key
+        elif parameter.kind == parameter.VAR_KEYWORD:
+            kwargs_name = key
+
+    return positional_names, args_name, keyword_names, kwargs_name
+
+
+def coalesce_arguments(function, predecessor_results):
+    positional_names, args_name, keyword_names, kwargs_name = coalesce_argument_names(
+        function
+    )
+
+    positional = [predecessor_results.pop(name) for name in positional_names]
+    args = [
+        predecessor_results.pop(name)
+        for name in list(predecessor_results.keys())
+        if name.startswith(args_name)
+    ]
+    keywords = {name: predecessor_results.pop(name) for name in keyword_names}
+    kwargs = {
+        name: predecessor_results.pop(name)
+        for name in list(predecessor_results)
+        if name.startswith(kwargs_name)
+    }
+
+    assert len(predecessor_results) == 0
+
+    return positional, args, keywords, kwargs
+
+
 def calculate(
     composer, outputs, perform_checks=True, intermediates=False, progress_callback=None
 ):
@@ -140,11 +190,16 @@ def calculate(
             results[node] = composer._cache.get(composer, node)
         else:
             log.debug("Calculating function '%s'", node)
-            fn = composer._functions[node]
+            function = composer._functions[node]
 
             # Pull up arguments
-            arguments = {parameter: results[pred] for parameter, pred in predecessors}
-            result = fn(**arguments)
+            predecessor_results = {
+                parameter: results[pred] for parameter, pred in predecessors
+            }
+            positional, args, keywords, kwargs = coalesce_arguments(
+                function, predecessor_results
+            )
+            result = function(*positional, *args, **keywords, **kwargs)
             results[node] = result
             composer._cache.set(composer, node, result)
 

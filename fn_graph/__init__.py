@@ -169,9 +169,23 @@ class Composer:
         Allows you to pass static parameters to the graph, they will be exposed as callables.
         """
 
+        parameters = {
+            key: parameter if isinstance(parameter, tuple) else (object, parameter)
+            for key, parameter in parameters.items()
+        }
+
+        def serve_parameter(type_, value):
+            def parameter():
+                return value
+
+            return parameter
+
         # Have to capture the value eagerly
         return self._copy(_parameters={**parameters, **self._parameters}).update(
-            **{k: (lambda x: (lambda: x))(v) for k, v in parameters.items()}
+            **{
+                key: serve_parameter(type_, value)
+                for key, (type_, value) in parameters.items()
+            }
         )
 
     def update_tests(self, **tests) -> Composer:
@@ -546,16 +560,40 @@ class Composer:
         else:
             return possible_preds[0]
 
+    def _resolve_var_predecessors(self, fname, pname):
+        fparts = fname.split("__")[:]
+        possible_preds = [
+            "__".join(fparts[:i] + [pname]) for i in range(0, len(fparts))
+        ]
+        possible_preds.reverse()
+
+        for possible_prefix in possible_preds:
+            for function in self._functions.keys():
+                if function.startswith(possible_prefix):
+                    key = pname + function[len(possible_prefix) :]
+
+                    yield key, function
+
     def _resolve_predecessors(self, fname):
 
         if fname not in self._functions:
             return []
 
         fn = self._functions[fname]
-        for pname, parameter in signature(fn).parameters.items():
-            resolved_name = self._resolve_predecessor(fname, pname)
-            if parameter.default is not Parameter.empty:
-                if resolved_name in self._functions:
-                    yield pname, resolved_name
+        sig = signature(fn)
+        for key, parameter in sig.parameters.items():
+            if parameter.kind in (
+                parameter.KEYWORD_ONLY,
+                parameter.POSITIONAL_OR_KEYWORD,
+                parameter.POSITIONAL_ONLY,
+            ):
+                resolved_name = self._resolve_predecessor(fname, key)
+
+                if parameter.default is not Parameter.empty:
+                    if resolved_name in self._functions:
+                        yield key, resolved_name
+                else:
+                    yield key, resolved_name
             else:
-                yield pname, resolved_name
+                yield from self._resolve_var_predecessors(fname, key)
+
