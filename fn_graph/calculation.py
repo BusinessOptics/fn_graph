@@ -1,9 +1,11 @@
 import time
+import sys
 from collections import Counter
 from enum import Enum
 from functools import reduce
 from inspect import Parameter, signature
 from logging import getLogger
+import traceback
 
 import networkx as nx
 from littleutils import ensure_list_if_string
@@ -40,9 +42,13 @@ def get_execution_instructions(composer, dag, outputs):
         | set(outputs)
     ) - invalid_nodes
 
+    log.debug(invalid_nodes)
+    log.debug(must_be_retrieved)
+
     execution_order = list(nx.topological_sort(dag))
     execution_instructions = []
     for node in execution_order:
+        log.debug(node)
         if node in invalid_nodes:
             node_instruction = NodeInstruction.CALCULATE
         elif node in must_be_retrieved:
@@ -60,7 +66,7 @@ def maintain_cache_consistency(composer):
     direct_invalid_nodes = {
         node for node in dag if not composer._cache.valid(composer, node)
     }
-
+    log.debug("Direct Invalid Loans %s", direct_invalid_nodes)
     # If a node is invalidate all it's descendents must be made invalid
     indirect_invalid_nodes = (
         reduce(
@@ -73,7 +79,7 @@ def maintain_cache_consistency(composer):
         composer._cache.invalidate(composer, node)
 
 
-def coalesce_argument_names(function):
+def coalesce_argument_names(function, predecessor_results):
     sig = signature(function)
 
     positional_names = []
@@ -87,6 +93,12 @@ def coalesce_argument_names(function):
             parameter.POSITIONAL_OR_KEYWORD,
             parameter.POSITIONAL_ONLY,
         ):
+            if (
+                parameter.default is not Parameter.empty
+                and key not in predecessor_results
+            ):
+                continue
+
             if args_name is None:
                 positional_names.append(key)
             else:
@@ -101,7 +113,7 @@ def coalesce_argument_names(function):
 
 def coalesce_arguments(function, predecessor_results):
     positional_names, args_name, keyword_names, kwargs_name = coalesce_argument_names(
-        function
+        function, predecessor_results
     )
 
     positional = [predecessor_results.pop(name) for name in positional_names]
@@ -122,14 +134,20 @@ def coalesce_arguments(function, predecessor_results):
     return positional, args, keywords, kwargs
 
 
-def calculate(
-    composer, outputs, perform_checks=True, intermediates=False, progress_callback=None
+def calculate_collect_exceptions(
+    composer,
+    outputs,
+    perform_checks=True,
+    intermediates=False,
+    progress_callback=None,
+    raise_immediately=False,
 ):
     """
     Executes the required parts of the function graph to product results
     for the given outputs.
 
     Args:
+        composer: The composer to calculate
         outputs: list of the names of the functions to calculate
         perform_checks: if true error checks are performed before calculation
         intermediates: if true the results of all functions calculated will be returned
@@ -137,7 +155,8 @@ def calculate(
                 this be of the form `callback(event_type, details)`
 
     Returns:
-        Dictionary: Dictionary of results keyed by function name
+        Tuple: Tuple of (results, exception_info), results is a dictionary of results keyed by 
+               function name, exception_info is the information about the exception if there was any.
     """
     outputs = ensure_list_if_string(outputs)
 
@@ -162,6 +181,7 @@ def calculate(
         outputs = dag.nodes()
 
     execution_instructions = get_execution_instructions(composer, dag, outputs)
+    log.debug(execution_instructions)
 
     progress_callback(
         "prepare_execution",
@@ -199,7 +219,16 @@ def calculate(
             positional, args, keywords, kwargs = coalesce_arguments(
                 function, predecessor_results
             )
-            result = function(*positional, *args, **keywords, **kwargs)
+            try:
+                result = function(*positional, *args, **keywords, **kwargs)
+            except Exception as e:
+                if raise_immediately:
+                    raise
+                else:
+                    etype, evalue, etraceback = sys.exc_info()
+
+                    return results, (etype, evalue, etraceback, node)
+
             results[node] = result
             composer._cache.set(composer, node, result)
 
@@ -228,4 +257,24 @@ def calculate(
         )
 
     # We should just be left with the results
+    return results, None
+
+
+def calculate(*args, **kwargs):
+    """
+    Executes the required parts of the function graph to product results
+    for the given outputs.
+
+    Args:
+        composer: The composer to calculate
+        outputs: list of the names of the functions to calculate
+        perform_checks: if true error checks are performed before calculation
+        intermediates: if true the results of all functions calculated will be returned
+        progress_callback: a callback that is called as the calculation progresses,\
+                this be of the form `callback(event_type, details)`
+
+    Returns:
+        Dictionary: Dictionary of results keyed by function name
+    """
+    results, _ = calculate_collect_exceptions(*args, raise_immediately=True, **kwargs)
     return results

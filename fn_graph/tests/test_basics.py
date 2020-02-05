@@ -5,7 +5,13 @@ def test_simple_parameters():
     composer = (
         Composer().update(c=lambda a, b: a + b).update_parameters(a=1, b=(int, 2))
     )
-    composer.graphviz()
+    assert composer.c() == 3
+
+
+def test_default_arguments():
+    composer = Composer().update(c=lambda a, b=3: a + b).update_parameters(a=1)
+    assert composer.c() == 4
+    composer = Composer().update(c=lambda a, b=3: a + b).update_parameters(a=1, b=2)
     assert composer.c() == 3
 
 

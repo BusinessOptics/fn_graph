@@ -101,7 +101,7 @@ class Composer:
         }
         return self.update(**args_with_names, **kwargs)
 
-    def update_without_suffix(self, suffix, *functions, **kwargs) -> Composer:
+    def update_without_suffix(self, suffix: str, *functions, **kwargs) -> Composer:
         """
         Given a suffix and a list of (named) functions, this adds the functions
         to the composer but first strips the suffix from their name. This is very
@@ -174,6 +174,14 @@ class Composer:
             for key, parameter in parameters.items()
         }
 
+        hydrated_parameters = {}
+        for key, parameter in parameters.items():
+            if isinstance(parameter, tuple):
+                hydrated_parameters[key] = parameter
+            else:
+                type_ = self._parameters.get(key, (object, None))[0]
+                hydrated_parameters[key] = (type_, parameter)
+
         def serve_parameter(type_, value):
             def parameter():
                 return value
@@ -181,10 +189,12 @@ class Composer:
             return parameter
 
         # Have to capture the value eagerly
-        return self._copy(_parameters={**parameters, **self._parameters}).update(
+        return self._copy(
+            _parameters={**self._parameters, **hydrated_parameters}
+        ).update(
             **{
                 key: serve_parameter(type_, value)
-                for key, (type_, value) in parameters.items()
+                for key, (type_, value) in hydrated_parameters.items()
             }
         )
 
@@ -220,6 +230,12 @@ class Composer:
 
         fns = {key: make_link_fn(source) for key, source in kwargs.items()}
         return self.update(**fns)
+
+    def parameters(self):
+        """
+        Dictionary of the parameters of the form {key: (type, value)}
+        """
+        return self._parameters
 
     def check(self):
         """
@@ -352,7 +368,9 @@ class Composer:
         composer that only consists of those nodes.
         """
         return self._copy(
-            _functions={k: self._functions[k] for k in function_names},
+            _functions={
+                k: self._functions[k] for k in function_names if k in self._functions
+            },
             _parameters={
                 k: v for k, v in self._parameters.items() if k in function_names
             },
@@ -362,7 +380,7 @@ class Composer:
         """
         Create a new composer with a given cache backend.
 
-        By default this is a Simple cache.
+        By default this is a SimpleCache.
         """
         backend = backend or SimpleCache()
         return self._copy(_cache=backend)
@@ -527,7 +545,7 @@ class Composer:
             root = tree
             parts = node.split("__")
             for part in parts[:-1]:
-                root = tree[part]
+                root = root[part]
             root[parts[-1]] = node
         return tree
 

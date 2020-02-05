@@ -8,6 +8,31 @@ from pathlib import Path
 log = getLogger(__name__)
 
 
+def fn_value(fn):
+    if getattr(fn, "_is_fn_graph_link", False):
+        return ",".join(inspect.signature(fn).parameters.keys())
+    else:
+        return inspect.getsource(fn)
+
+
+def hash_fn(composer, key):
+    value = (
+        composer._parameters[key]
+        if key in composer._parameters
+        else composer._functions[key]
+    )
+
+    log.debug(f"Fn Value {key}: {value}")
+
+    if callable(value):
+        buffer = fn_value(value).encode("utf-8")
+        return hashlib.sha256(buffer).digest()
+    else:
+        buffer = BytesIO()
+        pickle.dump(value, buffer)
+        return hashlib.sha256(buffer.getvalue()).digest()
+
+
 class NullCache:
     """
     Performs no caching.
@@ -37,19 +62,32 @@ class SimpleCache(NullCache):
 
     def __init__(self):
         self.cache = {}
+        self.hashes = {}
 
     def valid(self, composer, key):
-        return key in self.cache
+        log.debug("Length %s", len(composer._functions))
+        if key in self.hashes:
+            log.debug(f"hash test {key} {hash_fn(composer, key) == self.hashes[key]}")
+            return hash_fn(composer, key) == self.hashes[key]
+        else:
+            log.debug(f"cache test {key} {key in self.cache}")
+            return key in self.cache
 
     def get(self, composer, key):
         return self.cache[key]
 
     def set(self, composer, key, value):
         self.cache[key] = value
+        if key in composer.parameters():
+            self.hashes[key] = hash_fn(composer, key)
 
     def invalidate(self, composer, key):
+
         if key in self.cache:
             del self.cache[key]
+
+        if key in self.hashes:
+            del self.hashes[key]
 
 
 class DevelopmentCache(NullCache):
@@ -86,7 +124,7 @@ class DevelopmentCache(NullCache):
         if not exists:
             return False
 
-        current_hash = self._hash_fn(composer, key)
+        current_hash = hash_fn(composer, key)
         with open(self.cache_root / f"{key}.fn.hash", "rb") as f:
             previous_hash = f.read()
 
@@ -109,7 +147,7 @@ class DevelopmentCache(NullCache):
         log.debug("Writing to development cache '%s' for key '%s'", self.name, key)
 
         with open(self.cache_root / f"{key}.fn.hash", "wb") as f:
-            f.write(self._hash_fn(composer, key))
+            f.write(hash_fn(composer, key))
 
         with open(self.cache_root / f"{key}.pickle", "wb") as f:
             pickle.dump(value, f)
@@ -122,23 +160,3 @@ class DevelopmentCache(NullCache):
             if path.exists():
                 path.unlink()
 
-    def _fn_value(self, fn):
-        if getattr(fn, "_is_fn_graph_link", False):
-            return ",".join(inspect.signature(fn).parameters.keys())
-        else:
-            return inspect.getsource(fn)
-
-    def _hash_fn(self, composer, key):
-        value = (
-            composer._parameters[key]
-            if key in composer._parameters
-            else composer._functions[key]
-        )
-
-        if callable(value):
-            buffer = self._fn_value(value).encode("utf-8")
-            return hashlib.sha256(buffer).digest()
-        else:
-            buffer = BytesIO()
-            pickle.dump(value, buffer)
-            return hashlib.sha256(buffer.getvalue()).digest()
