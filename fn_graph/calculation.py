@@ -1,11 +1,10 @@
-import time
 import sys
+import traceback
 from collections import Counter
 from enum import Enum
 from functools import reduce
 from inspect import Parameter, signature
 from logging import getLogger
-import traceback
 
 import networkx as nx
 from littleutils import ensure_list_if_string
@@ -42,8 +41,8 @@ def get_execution_instructions(composer, dag, outputs):
         | set(outputs)
     ) - invalid_nodes
 
-    log.debug(invalid_nodes)
-    log.debug(must_be_retrieved)
+    log.debug("Invalid nodes %s", invalid_nodes)
+    log.debug("Retrived Nodes %s", must_be_retrieved)
 
     execution_order = list(nx.topological_sort(dag))
     execution_instructions = []
@@ -66,7 +65,8 @@ def maintain_cache_consistency(composer):
     direct_invalid_nodes = {
         node for node in dag if not composer._cache.valid(composer, node)
     }
-    log.debug("Direct Invalid Loans %s", direct_invalid_nodes)
+    log.debug("Direct invalid nodes %s", direct_invalid_nodes)
+
     # If a node is invalidate all it's descendents must be made invalid
     indirect_invalid_nodes = (
         reduce(
@@ -74,6 +74,7 @@ def maintain_cache_consistency(composer):
             [nx.descendants(dag, node) for node in direct_invalid_nodes] + [set()],
         )
     ) - direct_invalid_nodes
+    log.debug("Indirect invalid nodes %s", indirect_invalid_nodes)
 
     for node in indirect_invalid_nodes:
         composer._cache.invalidate(composer, node)
@@ -156,21 +157,32 @@ def calculate_collect_exceptions(
 
     Returns:
         Tuple: Tuple of (results, exception_info), results is a dictionary of results keyed by 
-               function name, exception_info is the information about the exception if there was any.
+               function name, exception_info (etype, evalue, etraceback, node) is the information 
+               about the exception if there was any.
     """
     outputs = ensure_list_if_string(outputs)
 
-    if perform_checks:
-        for name in outputs:
-            if name not in composer._functions:
-                raise Exception(
-                    f"'{name}' is not a composed function in this {composer.__class__.__name__} object."
-                )
-
-        for error in composer.check():
-            raise Exception(error)
-
     progress_callback = progress_callback or (lambda *args, **kwargs: None)
+
+    progress_callback("start_calculation", dict(outputs=outputs))
+
+    if perform_checks:
+        try:
+            for name in outputs:
+                if name not in composer._functions:
+                    raise Exception(
+                        f"'{name}' is not a composed function in this {composer.__class__.__name__} object."
+                    )
+
+            for error in composer.check(outputs):
+                raise Exception(error)
+        except:
+            if raise_immediately:
+                raise
+            else:
+                etype, evalue, etraceback = sys.exc_info()
+
+                return {}, (etype, evalue, etraceback, None)
 
     maintain_cache_consistency(composer)
 
@@ -183,78 +195,86 @@ def calculate_collect_exceptions(
     execution_instructions = get_execution_instructions(composer, dag, outputs)
     log.debug(execution_instructions)
 
-    progress_callback(
-        "prepare_execution",
-        dict(execution_instructions=execution_instructions, execution_graph=dag),
-    )
-
     # Results store
     results = {}
 
     # Number of time a functions results still needs to be accessed
     remaining_usage_counts = Counter(pred for pred, _ in dag.edges())
-
+    progress_callback(
+        "prepared_calculation",
+        dict(execution_instructions=execution_instructions, execution_graph=dag),
+    )
     log.debug("Starting execution")
     for node, instruction in execution_instructions:
-        start = time.time()
         progress_callback(
-            "start_function", dict(name=node, execution_instruction=instruction)
+            "start_step", dict(name=node, execution_instruction=instruction)
         )
-        predecessors = list(composer._resolve_predecessors(node))
+        try:
+            predecessors = list(composer._resolve_predecessors(node))
 
-        if instruction == NodeInstruction.IGNORE:
-            log.debug("Ignoring function '%s'", node)
+            if instruction == NodeInstruction.IGNORE:
+                log.debug("Ignoring function '%s'", node)
 
-        elif instruction == NodeInstruction.RETRIEVE:
-            log.debug("Retrieving function '%s'", node)
-            results[node] = composer._cache.get(composer, node)
-        else:
-            log.debug("Calculating function '%s'", node)
-            function = composer._functions[node]
+            elif instruction == NodeInstruction.RETRIEVE:
+                log.debug("Retrieving function '%s'", node)
+                try:
+                    progress_callback("start_cache_retrieval", dict(name=node))
+                    results[node] = composer._cache.get(composer, node)
+                finally:
+                    progress_callback("end_cache_retrieval", dict(name=node))
+            else:
+                log.debug("Calculating function '%s'", node)
+                function = composer._functions[node]
 
-            # Pull up arguments
-            predecessor_results = {
-                parameter: results[pred] for parameter, pred in predecessors
-            }
-            positional, args, keywords, kwargs = coalesce_arguments(
-                function, predecessor_results
+                # Pull up arguments
+                predecessor_results = {
+                    parameter: results[pred] for parameter, pred in predecessors
+                }
+                positional, args, keywords, kwargs = coalesce_arguments(
+                    function, predecessor_results
+                )
+
+                try:
+                    progress_callback("start_function", dict(name=node))
+                    result = function(*positional, *args, **keywords, **kwargs)
+                except Exception as e:
+                    if raise_immediately:
+                        raise
+                    else:
+                        etype, evalue, etraceback = sys.exc_info()
+
+                        return results, (etype, evalue, etraceback, node)
+                finally:
+                    progress_callback("end_function", dict(name=node))
+
+                results[node] = result
+
+                try:
+                    progress_callback("start_cache_store", dict(name=node))
+                    composer._cache.set(composer, node, result)
+                finally:
+                    progress_callback("end_cache_store", dict(name=node))
+
+            # Eject results from memory once the are not needed
+            remaining_usage_counts.subtract([pred for _, pred in predecessors])
+            ready_to_eject = [
+                key
+                for key, value in remaining_usage_counts.items()
+                if value == 0 and key not in outputs
+            ]
+            for key in ready_to_eject:
+                assert key not in outputs
+                remaining_usage_counts.pop(key)
+                results.pop(key, "not_found")
+        finally:
+            progress_callback(
+                "end_step",
+                dict(
+                    name=node,
+                    execution_instruction=instruction,
+                    result=results.get(node),
+                ),
             )
-            try:
-                result = function(*positional, *args, **keywords, **kwargs)
-            except Exception as e:
-                if raise_immediately:
-                    raise
-                else:
-                    etype, evalue, etraceback = sys.exc_info()
-
-                    return results, (etype, evalue, etraceback, node)
-
-            results[node] = result
-            composer._cache.set(composer, node, result)
-
-        # Eject results from memory once the are not needed
-        remaining_usage_counts.subtract([pred for _, pred in predecessors])
-        ready_to_eject = [
-            key
-            for key, value in remaining_usage_counts.items()
-            if value == 0 and key not in outputs
-        ]
-        for key in ready_to_eject:
-            assert key not in outputs
-            remaining_usage_counts.pop(key)
-            results.pop(key, "not_found")
-
-        period = time.time() - start
-
-        progress_callback(
-            "end_function",
-            dict(
-                name=node,
-                execution_instruction=instruction,
-                time=period,
-                result=results.get(node),
-            ),
-        )
 
     # We should just be left with the results
     return results, None
