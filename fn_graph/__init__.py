@@ -169,22 +169,23 @@ class Composer:
         Allows you to pass static parameters to the graph, they will be exposed as callables.
         """
 
-        parameters = {
-            key: parameter if isinstance(parameter, tuple) else (object, parameter)
-            for key, parameter in parameters.items()
-        }
-
         hydrated_parameters = {}
         for key, parameter in parameters.items():
             if isinstance(parameter, tuple):
                 hydrated_parameters[key] = parameter
             else:
-                type_ = self._parameters.get(key, (object, None))[0]
+                type_ = self._parameters.get(key, (type(parameter), None))[0]
                 hydrated_parameters[key] = (type_, parameter)
 
-        def serve_parameter(type_, value):
+        def serve_parameter(key, type_, value):
             def parameter():
-                return value
+                cast_value = value
+                if isinstance(cast_value, int) and issubclass(type_, float):
+                    cast_value = float(value)
+
+                if not isinstance(cast_value, type_):
+                    raise Exception(f"Parameter '{key}' is not of type {type_}")
+                return cast_value
 
             return parameter
 
@@ -193,7 +194,7 @@ class Composer:
             _parameters={**self._parameters, **hydrated_parameters}
         ).update(
             **{
-                key: serve_parameter(type_, value)
+                key: serve_parameter(key, type_, value)
                 for key, (type_, value) in hydrated_parameters.items()
             }
         )
@@ -237,18 +238,23 @@ class Composer:
         """
         return self._parameters
 
-    def check(self):
+    def check(self, outputs=None):
         """
         Returns a generator of errors if there are any errors in the function graph.
         """
-        dag = self.dag()
+        if outputs is None:
+            dag = self.dag()
+        else:
+            dag = self.ancestor_dag(outputs)
+
         cycles = list(nx.simple_cycles(dag))
         if cycles:
             yield dict(
                 type="cycle",
                 message=f"Cycle found [{', '.join(cycles[0])}]. The function graph must be acyclic.",
             )
-        for unbound_fn, calling_fns in self._unbound().items():
+
+        for unbound_fn, calling_fns in self.subgraph(dag.nodes())._unbound().items():
             yield dict(
                 type="unbound",
                 message=f"Unbound function '{unbound_fn}' required.",
