@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict, namedtuple
 from functools import reduce
 from inspect import Parameter, signature
+import inspect
 from itertools import groupby
 from logging import getLogger
 from typing import Any, Callable, List
@@ -36,13 +37,22 @@ class Composer:
     a directed acyclic graph.
     """
 
-    def __init__(self, *, _functions=None, _parameters=None, _cache=None, _tests=None):
+    def __init__(
+        self,
+        *,
+        _functions=None,
+        _parameters=None,
+        _cache=None,
+        _tests=None,
+        _source_map=None,
+    ):
         # These are namespaced
         self._functions = _functions or {}
         self._tests = _tests or {}
 
         self._cache = _cache or NullCache()
         self._parameters = _parameters or {}
+        self._source_map = _source_map or {}
 
     def _copy(self, **kwargs):
         return type(self)(
@@ -52,6 +62,7 @@ class Composer:
                     _cache=self._cache,
                     _parameters=self._parameters,
                     _tests=self._tests,
+                    _source_map=self._source_map,
                 ),
                 **kwargs,
             }
@@ -231,6 +242,12 @@ class Composer:
 
         fns = {key: make_link_fn(source) for key, source in kwargs.items()}
         return self.update(**fns)
+
+    def functions(self):
+        """
+        Dictionary of the functions
+        """
+        return self._functions
 
     def parameters(self):
         """
@@ -538,6 +555,34 @@ class Composer:
                     result.edge(pred, node)
 
         return result
+
+    def set_source_map(self, source_map):
+        """
+        Source maps allow you to override the code returned by get source. 
+
+        This is rarely used, and only in esoteric circumstances.
+        """
+        return self._copy(_source_map=source_map)
+
+    def get_source(self, key):
+        """
+        Returns the source code that defines this function.
+        """
+        fn = self.raw_function(key)
+        is_parameter = key in self._parameters
+
+        if key in self._source_map:
+            return self._source_map[key]
+        elif is_parameter:
+            return f"{key} = lambda: {self._parameters[key]}"
+        elif getattr(fn, "_is_fn_graph_link", False):
+            parameter = list(inspect.signature(fn).parameters.keys())[0]
+            return f"{key} = lambda {parameter}: {parameter}"
+        else:
+            try:
+                return inspect.getsource(fn)
+            except OSError:
+                return "Source could not be located"
 
     def _build_name_tree(self):
         # Build up a tree of the subgraphs
