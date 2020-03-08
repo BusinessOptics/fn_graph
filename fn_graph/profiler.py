@@ -2,7 +2,7 @@ import time
 
 
 def now():
-    return time.clock()
+    return time.perf_counter()
 
 
 class Profiler:
