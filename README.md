@@ -1,11 +1,21 @@
 # Fn Graph
 
-Light weight function pipelines for python. 
+Light weight function pipelines for python.
+
+## Documentation
+
+Please find detailed documentation at https://fn-graph.readthedocs.io/
 
 ## Installation
 
 ```
 pip install fn_graph
+```
+
+You will need to have graphviz and the development packages installed. On ubuntu you can install these with.
+
+```
+sudo apt-get install graphviz graphviz-dev
 ```
 
 ## Outline of the problem
