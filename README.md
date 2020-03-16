@@ -2,6 +2,19 @@
 
 Light weight function pipelines for python.
 
+## Overview
+
+`fn_graph` is trying to solve a number of problems in the python data-science/modelling domain, as well as making it easier to put such models into production.
+
+It aims to:
+
+1. Make moving between the analyst space to production. amd back, simpler and less error prone.
+2. Make it easy to view the intermediate results of computations to easily diagnose errors.
+3. Solve common analyst issues like creating reusable, composable pipelines and caching results.
+4. Visualizing models in an intuitive way.
+
+There is an associated visual studio you should check out at https://github.com/BusinessOptics/fn_graph_studio/.
+
 ## Documentation
 
 Please find detailed documentation at https://fn-graph.readthedocs.io/
@@ -12,11 +25,13 @@ Please find detailed documentation at https://fn-graph.readthedocs.io/
 pip install fn_graph
 ```
 
-You will need to have graphviz and the development packages installed. On ubuntu you can install these with.
+You will need to have graphviz and the development packages installed. On ubuntu you can install these with:
 
 ```
 sudo apt-get install graphviz graphviz-dev
 ```
+
+Otherwise see the [pygraphviz documentation](http://pygraphviz.github.io/documentation/pygraphviz-1.5/install.html).
 
 ## Outline of the problem
 
@@ -72,7 +87,7 @@ def get_c():
 ```
 
 _Pros:_ This is easy to reference from both the notebook and production\
-_Cons:_ The modeller cannot see the intermediate results and functions cannot be reused.
+_Cons:_ The modeller cannot see the intermediate results and functions cannot be reused. Functions are called multiple times.
 
 None of these are great. Fn Graph would solve it like this.
 
@@ -107,7 +122,7 @@ The composer can then be easily passed around in both the production and noteboo
 - Update composers to gradually build more and more complex logic.
 - Enable incredible function reuse.
 - Visualize logic to make knowledge sharing easier.
-- Perform graph operations on composers to dynamically rewire your logic
+- Perform graph operations on composers to dynamically rewire your logic.
 - Manage calculation life cycle, with hooks, and have access to all intermediary calculations.
 - Cache results, either within a single session, or between sessions in development mode. Using the development cache intelligently invalidate the cache when code changes .
 
