@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fn_graph"
-version = "0.6.0"
+version = "0.7.0"
 description = "Manage, maintain and reuse complex function graphs without the hassle."
 authors = ["James Saunders <james@businessoptics.biz>"]
 license = "MIT"
