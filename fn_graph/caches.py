@@ -15,14 +15,17 @@ def fn_value(fn):
         return inspect.getsource(fn)
 
 
-def hash_fn(composer, key):
+def hash_fn(composer, key, use_id=False):
     value = (
         composer._parameters[key]
         if key in composer._parameters
         else composer._functions[key]
     )
 
-    log.debug(f"Fn Value {key}: {value}")
+    log.debug(f"Fn Value %s: %s", key, value)
+
+    if use_id:
+        return id(value)
 
     if callable(value):
         buffer = fn_value(value).encode("utf-8")
@@ -57,18 +60,27 @@ class SimpleCache(NullCache):
     """
     Stores results in memory, performs no automatic invalidation.
 
+    Set hash_parameters=False to only check the object identities of parameters
+    when checking cache validity. This is slightly less robust to buggy usage
+    but is much faster for big parameter objects.
+
     DO NOT USE THIS IN DEVELOPMENT OR A NOTEBOOK!
     """
 
-    def __init__(self):
+    def __init__(self, hash_parameters=True):
         self.cache = {}
         self.hashes = {}
+        self.hash_parameters = hash_parameters
+
+    def _hash(self, composer, key):
+        return hash_fn(composer, key, use_id=not self.hash_parameters)
 
     def valid(self, composer, key):
         log.debug("Length %s", len(composer._functions))
         if key in self.hashes:
-            log.debug(f"hash test {key} {hash_fn(composer, key) == self.hashes[key]}")
-            return hash_fn(composer, key) == self.hashes[key]
+            matches = self._hash(composer, key) == self.hashes[key]
+            log.debug(f"hash test {key} {matches}")
+            return matches
         else:
             log.debug(f"cache test {key} {key in self.cache}")
             return key in self.cache
@@ -79,7 +91,7 @@ class SimpleCache(NullCache):
     def set(self, composer, key, value):
         self.cache[key] = value
         if key in composer.parameters():
-            self.hashes[key] = hash_fn(composer, key)
+            self.hashes[key] = self._hash(composer, key)
 
     def invalidate(self, composer, key):
 
