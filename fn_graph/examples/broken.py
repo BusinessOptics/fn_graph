@@ -1,10 +1,9 @@
-"An example showing caching behaviour."
+"An example with a broken composer."
 
 #%%
 import sys
 from pathlib import Path
 from random import choice, random
-
 
 import pandas as pd
 import numpy as np
@@ -25,9 +24,9 @@ f = (
             * np.sin(df.x / 500 * math.pi * frequency)
         ),
         plot=lambda wave: px.line(wave, x="x", y="y"),
+        broken=lambda wave, missing: wave,
     )
     .update_parameters(frequency=(float, 1), amplitude=(float, 1))
-).cache()
-
+)
 
 # %%

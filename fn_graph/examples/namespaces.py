@@ -1,3 +1,4 @@
+"A basic example of namespaces."
 #%%
 from fn_graph import Composer
 
@@ -50,5 +51,6 @@ linked_parent = (
     .link(child_one__factor="factoring__calculated_factor")
 )
 
+f = linked_parent
 
 # %%
