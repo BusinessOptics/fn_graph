@@ -21,7 +21,7 @@ if os.path.exists(readme_path):
 setup(
     long_description=readme,
     name='fn_graph',
-    version='0.7.2',
+    version='0.7.3',
     description='Manage, maintain and reuse complex function graphs without the hassle.',
     python_requires='==3.*,>=3.7.0',
     project_urls={
@@ -34,7 +34,7 @@ setup(
     license='MIT',
     packages=['fn_graph', 'fn_graph.examples', 'fn_graph.tests'],
     package_dir={"": "."},
-    package_data={},
+    package_data={"fn_graph.examples": ["*.csv"]},
     install_requires=[
         'graphviz==0.*,>=0.13.2', 'joblib==0.*,>=0.14.1',
         'littleutils==0.*,>=0.2.1', 'networkx==2.*,>=2.4.0',
@@ -42,9 +42,9 @@ setup(
     ],
     extras_require={
         "dev": [
-            "black==18.*,>=18.3.0", "matplotlib==3.*,>=3.2.1",
+            "black==18.*,>=18.3.0", "matplotlib==3.*,>=3.0.0",
             "mkdocs==1.*,>=1.0.0", "pandas==0.*,>=0.25.3",
-            "plotly==4.*,>=4.4.0", "pytest==5.*,>=5.3.0",
+            "plotly==4.*,>=4.0.0", "pytest==5.*,>=5.3.0",
             "recommonmark==0.*,>=0.6.0", "seaborn==0.*,>=0.10.0",
             "sklearn==0.*,>=0.0.0", "sphinx==2.*,>=2.2.0",
             "sphinx-rtd-theme==0.*,>=0.4.3", "statsmodels==0.*,>=0.11.1"
