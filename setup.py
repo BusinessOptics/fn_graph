@@ -21,7 +21,7 @@ if os.path.exists(readme_path):
 setup(
     long_description=readme,
     name='fn_graph',
-    version='0.7.0',
+    version='0.7.1',
     description='Manage, maintain and reuse complex function graphs without the hassle.',
     python_requires='==3.*,>=3.7.0',
     project_urls={
@@ -42,10 +42,12 @@ setup(
     ],
     extras_require={
         "dev": [
-            "black==18.*,>=18.3.0", "mkdocs==1.*,>=1.0.0",
-            "pandas==0.*,>=0.25.3", "pytest==5.*,>=5.3.0",
-            "recommonmark==0.*,>=0.6.0", "sphinx==2.*,>=2.2.0",
-            "sphinx-rtd-theme==0.*,>=0.4.3"
+            "black==18.*,>=18.3.0", "matplotlib==3.*,>=3.2.1",
+            "mkdocs==1.*,>=1.0.0", "pandas==0.*,>=0.25.3",
+            "plotly==4.*,>=4.4.0", "pytest==5.*,>=5.3.0",
+            "recommonmark==0.*,>=0.6.0", "seaborn==0.*,>=0.10.0",
+            "sklearn==0.*,>=0.0.0", "sphinx==2.*,>=2.2.0",
+            "sphinx-rtd-theme==0.*,>=0.4.3", "statsmodels==0.*,>=0.11.1"
         ]
     },
 )
