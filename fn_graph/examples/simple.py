@@ -2,15 +2,11 @@
 A simple example showing basic functionality.
 """
 #%%
-import sys
-from pathlib import Path
 from random import choice, random
 
 import pandas as pd
 import plotly.express as px
 from fn_graph import Composer
-
-from fn_graph_studio import run_studio
 
 prices = [random() * 100_000 + 50000 for _ in range(10)]
 

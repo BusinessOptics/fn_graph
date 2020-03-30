@@ -1,7 +1,6 @@
 "An example with a broken composer."
 
 #%%
-import sys
 from pathlib import Path
 from random import choice, random
 
@@ -11,7 +10,6 @@ import plotly.express as px
 import math
 
 from fn_graph import Composer
-from fn_graph_studio import run_studio
 
 prices = [random() * 100_000 + 50000 for _ in range(10)]
 
