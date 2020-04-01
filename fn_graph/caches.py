@@ -1,5 +1,6 @@
 import hashlib
 import inspect
+import json
 import pickle
 from io import BytesIO
 from logging import getLogger
@@ -67,7 +68,7 @@ class SimpleCache(NullCache):
     DO NOT USE THIS IN DEVELOPMENT OR A NOTEBOOK!
     """
 
-    def __init__(self, hash_parameters=True):
+    def __init__(self, hash_parameters=False):
         self.cache = {}
         self.hashes = {}
         self.hash_parameters = hash_parameters
@@ -125,7 +126,12 @@ class DevelopmentCache(NullCache):
         self.cache_root.mkdir(parents=True, exist_ok=True)
 
     def valid(self, composer, key):
-        exists = (self.cache_root / f"{key}.pickle").exists()
+        pickle_file_path = self.cache_root / f"{key}.data"
+        info_file_path = self.cache_root / f"{key}.info.json"
+        fn_hash_path = self.cache_root / f"{key}.fn.hash"
+
+        exists = pickle_file_path.exists() and info_file_path.exists()
+
         log.debug(
             "Checking development cache '%s' for key '%s': exists = %s",
             self.name,
@@ -137,7 +143,7 @@ class DevelopmentCache(NullCache):
             return False
 
         current_hash = hash_fn(composer, key)
-        with open(self.cache_root / f"{key}.fn.hash", "rb") as f:
+        with open(fn_hash_path, "rb") as f:
             previous_hash = f.read()
 
         if current_hash != previous_hash:
@@ -152,23 +158,67 @@ class DevelopmentCache(NullCache):
 
     def get(self, composer, key):
         log.debug("Retrieving from development cache '%s' for key '%s'", self.name, key)
-        with open(self.cache_root / f"{key}.pickle", "rb") as f:
-            return pickle.load(f)
+
+        pickle_file_path = self.cache_root / f"{key}.data"
+        info_file_path = self.cache_root / f"{key}.info.json"
+
+        with open(info_file_path, "r") as f:
+            information = json.load(f)
+
+        format = information["format"]
+
+        with open(pickle_file_path, "rb") as f:
+            if format == "pickle":
+                return pickle.load(f)
+            elif format == "pandas-parquet":
+                import pandas as pd
+
+                return pd.read_parquet(f)
+            else:
+                raise Exception(f"Unknown caching fn_graph format: {format}")
 
     def set(self, composer, key, value):
-        log.debug("Writing to development cache '%s' for key '%s'", self.name, key)
 
-        with open(self.cache_root / f"{key}.fn.hash", "wb") as f:
+        log.debug("Writing to development cache '%s' for key '%s'", self.name, key)
+        pickle_file_path = self.cache_root / f"{key}.data"
+        info_file_path = self.cache_root / f"{key}.info.json"
+        fn_hash_path = self.cache_root / f"{key}.fn.hash"
+
+        # This is a low-fi way to checK the type without adding requirements
+        # I am concerned it is fragile
+        if str(type(value)) == "<class 'pandas.core.frame.DataFrame'>":
+            format = "pandas-parquet"
+        else:
+            format = "pickle"
+
+        saved = False
+        if format == "pandas-parquet":
+            try:
+                with open(pickle_file_path, "wb") as f:
+                    value.to_parquet(f)
+                saved = True
+            except:
+                saved = False
+
+        if not saved:
+            format = "pickle"
+            with open(pickle_file_path, "wb") as f:
+                pickle.dump(value, f)
+
+        with open(fn_hash_path, "wb") as f:
             f.write(hash_fn(composer, key))
 
-        with open(self.cache_root / f"{key}.pickle", "wb") as f:
-            pickle.dump(value, f)
+        with open(info_file_path, "w") as f:
+            json.dump({"format": format}, f)
 
     def invalidate(self, composer, key):
         log.debug("Invalidation in development cache '%s' for key '%s'", self.name, key)
-        paths = [self.cache_root / f"{key}.pickle", self.cache_root / f"{key}.fn.hash"]
+        paths = [
+            self.cache_root / f"{key}.data",
+            self.cache_root / f"{key}.fn.hash",
+            self.cache_root / f"{key}.info.json",
+        ]
 
         for path in paths:
             if path.exists():
                 path.unlink()
-
