@@ -6,6 +6,7 @@ from io import BytesIO
 from logging import getLogger
 from pathlib import Path
 
+
 log = getLogger(__name__)
 
 
@@ -18,7 +19,7 @@ def fn_value(fn):
 
 def hash_fn(composer, key, use_id=False):
     value = (
-        composer._parameters[key]
+        composer._parameters[key][1]
         if key in composer._parameters
         else composer._functions[key]
     )
@@ -79,8 +80,10 @@ class SimpleCache(NullCache):
     def valid(self, composer, key):
         log.debug("Length %s", len(composer._functions))
         if key in self.hashes:
-            matches = self._hash(composer, key) == self.hashes[key]
-            log.debug(f"hash test {key} {matches}")
+            current_hash = self._hash(composer, key)
+            stored_hash = self.hashes[key]
+            matches = current_hash == stored_hash
+            log.debug(f"hash test {key} {matches}: {current_hash} {stored_hash}")
             return matches
         else:
             log.debug(f"cache test {key} {key in self.cache}")

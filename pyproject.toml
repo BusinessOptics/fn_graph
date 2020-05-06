@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fn_graph"
-version = "0.7.3"
+version = "0.8.0"
 description = "Manage, maintain and reuse complex function graphs without the hassle."
 authors = ["James Saunders <james@businessoptics.biz>"]
 license = "MIT"
@@ -14,7 +14,6 @@ python = "^3.7"
 networkx = "^2.4"
 graphviz = "^0.13.2"
 littleutils = "^0.2.1"
-typing = "^3.7"
 joblib = "^0.14.1"
 
 [tool.poetry.dev-dependencies]
