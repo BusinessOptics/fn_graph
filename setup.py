@@ -21,7 +21,7 @@ if os.path.exists(readme_path):
 setup(
     long_description=readme,
     name='fn_graph',
-    version='0.8.0',
+    version='0.8.1',
     description='Manage, maintain and reuse complex function graphs without the hassle.',
     python_requires='==3.*,>=3.7.0',
     project_urls={
@@ -37,8 +37,7 @@ setup(
     package_data={"fn_graph.examples": ["*.csv"]},
     install_requires=[
         'graphviz==0.*,>=0.13.2', 'joblib==0.*,>=0.14.1',
-        'littleutils==0.*,>=0.2.1', 'networkx==2.*,>=2.4.0',
-        'typing==3.*,>=3.7.0'
+        'littleutils==0.*,>=0.2.1', 'networkx==2.*,>=2.4.0'
     ],
     extras_require={
         "dev": [
