@@ -1,4 +1,11 @@
-"A simple machine learing example."
+"""
+A simple machine learning example that builds a classifier for the standard iris dataset.
+
+This example uses scikit-learn to build a a classifier to detect the species of an iris 
+flower based on attributes of the flower. Based on the parameters different types of models 
+can be trained, and preprocessing can be turned on and off. It also show cases the integration 
+of visualisations to measure the accuracy of the model.  
+"""
 
 from fn_graph import Composer
 import sklearn, sklearn.datasets, sklearn.svm, sklearn.linear_model, sklearn.metrics
@@ -138,7 +145,7 @@ f = (
     Composer()
     .update_parameters(
         # Parameter controlling the model type (ols, svc)
-        model_type="olm",
+        model_type="ols",
         # Parameter enabling data preprocessing
         do_preprocess=True,
     )

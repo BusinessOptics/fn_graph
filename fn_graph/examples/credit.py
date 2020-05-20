@@ -1,6 +1,10 @@
 """
 A credit model that uses a machine learning model to estimate the expected 
 value of the the remaining loans in a loan book.
+
+The example shows how to integrate a machine learning model with some simple 
+domain information to get contextualized result. It also show cases how statistical
+libraries like Seaborn can be used to investigate data before hand. 
 """
 
 from pathlib import Path
@@ -62,7 +66,7 @@ def model(training_features, training_target):
 
 def prediction_data(loan_data):
     """
-    Only consider teh currently live loans
+    Only consider the currently live loans
     """
     return loan_data[loan_data.status == "LIVE"]
 
@@ -114,5 +118,5 @@ composer = Composer().update(
     value_of_live_book,
 )
 
-# Just for uniformity with the rest of teh examples
+# Just for uniformity with the rest of the examples
 f = composer
