@@ -23,17 +23,23 @@ Please find detailed documentation at https://fn-graph.readthedocs.io/
 
 ## Installation
 
-```
+```sh
 pip install fn_graph
 ```
 
 You will need to have graphviz and the development packages installed. On ubuntu you can install these with:
 
-```
+```sh
 sudo apt-get install graphviz graphviz-dev
 ```
 
 Otherwise see the [pygraphviz documentation](http://pygraphviz.github.io/documentation/pygraphviz-1.5/install.html).
+
+To run all the examples install
+
+```sh
+pip install fn_graph[examples]
+```
 
 ## Features
 
@@ -56,7 +62,6 @@ Integrated and intelligent caching improves modelling development iteration time
 The composable pipelines allow for easy model reuse, as well as building up models from simpler submodels. Easily collaborate in teams to build models to any level of complexity, while keeping the individual components easy to understand and well encapsulated.
 * **It's just Python functions**\
 It's just plain Python! Use all your existing knowledge, everything will work as expected. Integrate with any existing python codebases. Use it with any other framework, there are no restrictions.
-
 
 ## Similar projects
 
