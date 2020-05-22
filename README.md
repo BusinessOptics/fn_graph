@@ -10,7 +10,7 @@ For more information and live examples look at [fn-graph.businessoptics.biz](htt
 
 It aims to:
 
-1. Make moving between the analyst space to production. amd back, simpler and less error prone.
+1. Make moving between the analyst space to production, and back, simpler and less error prone.
 2. Make it easy to view the intermediate results of computations to easily diagnose errors.
 3. Solve common analyst issues like creating reusable, composable pipelines and caching results.
 4. Visualizing models in an intuitive way.
