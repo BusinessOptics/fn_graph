@@ -22,6 +22,7 @@ matplotlib = { version ="^3.0", optional = true }
 sklearn = { version ="^0.0", optional = true }
 plotly = { version ="^4.0", optional = true }
 pandas = { version ="^0.25.3", optional = true }
+yfinance = { version ="*", optional = true }
 
 [tool.poetry.dev-dependencies]
 
@@ -33,7 +34,7 @@ sphinx_rtd_theme = "^0.4.3"
 recommonmark = "^0.6.0"
 
 [tool.poetry.extras]
-examples = ["seaborn", "statsmodels", "matplotlib", "sklearn", "plotly", "pandas"]
+examples = ["seaborn", "statsmodels", "matplotlib", "sklearn", "plotly", "pandas", "yfinance"]
 
 [tool.dephell.main]
 from = {format = "poetry", path = "pyproject.toml"}

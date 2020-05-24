@@ -66,7 +66,7 @@ toml = ">=0.9.4"
 d = ["aiohttp (>=3.3.2)"]
 
 [[package]]
-category = "dev"
+category = "main"
 description = "Python package for providing Mozilla's CA Bundle."
 name = "certifi"
 optional = false
@@ -74,7 +74,7 @@ python-versions = "*"
 version = "2020.4.5.1"
 
 [[package]]
-category = "dev"
+category = "main"
 description = "Universal encoding detector for Python 2 and 3"
 name = "chardet"
 optional = false
@@ -158,7 +158,7 @@ docs = ["sphinx (>=1.7)", "sphinx-rtd-theme"]
 test = ["mock (>=2)", "pytest (>=3.4,<3.10.0 || >3.10.0)", "pytest-mock (>=1.8)", "pytest-cov"]
 
 [[package]]
-category = "dev"
+category = "main"
 description = "Internationalized Domain Names in Applications (IDNA)"
 name = "idna"
 optional = false
@@ -325,6 +325,14 @@ name = "more-itertools"
 optional = false
 python-versions = ">=3.5"
 version = "8.3.0"
+
+[[package]]
+category = "main"
+description = "Non-blocking Python methods using decorators"
+name = "multitasking"
+optional = true
+python-versions = "*"
+version = "0.0.9"
 
 [[package]]
 category = "main"
@@ -549,7 +557,7 @@ python-versions = "*"
 version = "2020.5.14"
 
 [[package]]
-category = "dev"
+category = "main"
 description = "Python HTTP for Humans."
 name = "requests"
 optional = false
@@ -815,7 +823,7 @@ version = "4.46.0"
 dev = ["py-make (>=0.1.0)", "twine", "argopt", "pydoc-markdown"]
 
 [[package]]
-category = "dev"
+category = "main"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 name = "urllib3"
 optional = false
@@ -836,6 +844,20 @@ python-versions = "*"
 version = "0.1.9"
 
 [[package]]
+category = "main"
+description = "Yahoo! Finance market data downloader"
+name = "yfinance"
+optional = true
+python-versions = "*"
+version = "0.1.54"
+
+[package.dependencies]
+multitasking = ">=0.0.7"
+numpy = ">=1.15"
+pandas = ">=0.24"
+requests = ">=2.20"
+
+[[package]]
 category = "dev"
 description = "Backport of pathlib-compatible object wrapper for zip files"
 marker = "python_version < \"3.8\""
@@ -849,10 +871,10 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [extras]
-examples = ["seaborn", "statsmodels", "matplotlib", "sklearn", "plotly", "pandas"]
+examples = ["seaborn", "statsmodels", "matplotlib", "sklearn", "plotly", "pandas", "yfinance"]
 
 [metadata]
-content-hash = "aa7d4525f4602967a1abc128b2ba3ddd780b7b3d45761d175e26b6e4519a8cca"
+content-hash = "1e31c6ecad19ac3a6e72696d28b792d76d32198ec4b53fcb1e84ab41a590297f"
 python-versions = "^3.7"
 
 [metadata.files]
@@ -1030,6 +1052,9 @@ mkdocs = [
 more-itertools = [
     {file = "more-itertools-8.3.0.tar.gz", hash = "sha256:558bb897a2232f5e4f8e2399089e35aecb746e1f9191b6584a151647e89267be"},
     {file = "more_itertools-8.3.0-py3-none-any.whl", hash = "sha256:7818f596b1e87be009031c7653d01acc46ed422e6656b394b0f765ce66ed4982"},
+]
+multitasking = [
+    {file = "multitasking-0.0.9.tar.gz", hash = "sha256:b59d99f709d2e17d60ccaa2be09771b6e9ed9391c63f083c0701e724f624d2e0"},
 ]
 networkx = [
     {file = "networkx-2.4-py3-none-any.whl", hash = "sha256:cdfbf698749a5014bf2ed9db4a07a5295df1d3a53bf80bf3cbd61edf9df05fa1"},
@@ -1310,6 +1335,9 @@ urllib3 = [
 wcwidth = [
     {file = "wcwidth-0.1.9-py2.py3-none-any.whl", hash = "sha256:cafe2186b3c009a04067022ce1dcd79cb38d8d65ee4f4791b8888d6599d1bbe1"},
     {file = "wcwidth-0.1.9.tar.gz", hash = "sha256:ee73862862a156bf77ff92b09034fc4825dd3af9cf81bc5b360668d425f3c5f1"},
+]
+yfinance = [
+    {file = "yfinance-0.1.54.tar.gz", hash = "sha256:cee223cbd31e14955869f7978bcf83776d644345c7dea31ba5d41c309bfb0d3d"},
 ]
 zipp = [
     {file = "zipp-3.1.0-py3-none-any.whl", hash = "sha256:aa36550ff0c0b7ef7fa639055d797116ee891440eac1a56f378e2d3179e0320b"},
