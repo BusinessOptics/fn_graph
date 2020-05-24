@@ -24,7 +24,7 @@ if os.path.exists(readme_path):
 setup(
     long_description=readme,
     name='fn_graph',
-    version='0.12.0',
+    version='0.13.0',
     description='Manage, maintain and reuse complex function graphs without the hassle.',
     python_requires='==3.*,>=3.7.0',
     project_urls={"documentation": "https://fn-graph.readthedocs.io/", "homepage": "https://github.com/BusinessOptics/fn_graph", "repository": "https://github.com/BusinessOptics/fn_graph"},
@@ -35,5 +35,5 @@ setup(
     package_dir={"": "."},
     package_data={"fn_graph.examples": ["*.csv"]},
     install_requires=['graphviz==0.*,>=0.13.2', 'littleutils==0.*,>=0.2.1', 'networkx==2.*,>=2.4.0'],
-    extras_require={"dev": ["black==18.*,>=18.3.0.a0", "mkdocs==1.*,>=1.0.0", "pytest==5.*,>=5.3.0", "recommonmark==0.*,>=0.6.0", "sphinx==2.*,>=2.2.0", "sphinx-rtd-theme==0.*,>=0.4.3"], "examples": ["matplotlib==3.*,>=3.0.0", "pandas==0.*,>=0.25.3", "plotly==4.*,>=4.0.0", "seaborn==0.*,>=0.10.0", "sklearn==0.*,>=0.0.0", "statsmodels==0.*,>=0.11.1"]},
+    extras_require={"dev": ["black==18.*,>=18.3.0.a0", "mkdocs==1.*,>=1.0.0", "pytest==5.*,>=5.3.0", "recommonmark==0.*,>=0.6.0", "sphinx==2.*,>=2.2.0", "sphinx-rtd-theme==0.*,>=0.4.3"], "examples": ["matplotlib==3.*,>=3.0.0", "pandas==0.*,>=0.25.3", "plotly==4.*,>=4.0.0", "seaborn==0.*,>=0.10.0", "sklearn==0.*,>=0.0.0", "statsmodels==0.*,>=0.11.1", "yfinance"]},
 )
