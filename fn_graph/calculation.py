@@ -63,7 +63,9 @@ def maintain_cache_consistency(composer):
     dag = composer.dag()
 
     direct_invalid_nodes = {
-        node for node in dag if not composer._cache.valid(composer, node)
+        node
+        for node in composer._functions
+        if node in dag and not composer._cache.valid(composer, node)
     }
     log.debug("Direct invalid nodes %s", direct_invalid_nodes)
 

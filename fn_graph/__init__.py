@@ -82,14 +82,16 @@ class Composer:
         """
         args_with_names = {arg.__name__: arg for arg in args}
         all_args = {**self._functions, **args_with_names, **kwargs}
-
+        parameters = {
+            k: v for k, v in self._parameters.items() if k not in args_with_names
+        }
         for argname, argument in all_args.items():
             if not callable(argument):
                 raise Exception(
                     f"Argument '{argname}' is not a function or callable. All arguments must be callable."
                 )
 
-        return self._copy(_functions=all_args)
+        return self._copy(_functions=all_args, _parameters=parameters)
 
     def update_without_prefix(
         self, prefix: str, *functions: Callable, **kwargs: Callable
@@ -200,14 +202,16 @@ class Composer:
 
             return parameter
 
-        # Have to capture the value eagerly
         return self._copy(
-            _parameters={**self._parameters, **hydrated_parameters}
-        ).update(
-            **{
-                key: serve_parameter(key, type_, value)
-                for key, (type_, value) in hydrated_parameters.items()
-            }
+            _parameters={**self._parameters, **hydrated_parameters},
+            _functions={
+                **self._functions,
+                **{
+                    # Have to capture the value eagerly
+                    key: serve_parameter(key, type_, value)
+                    for key, (type_, value) in hydrated_parameters.items()
+                },
+            },
         )
 
     def update_tests(self, **tests) -> Composer:
@@ -665,4 +669,3 @@ class Composer:
                     yield key, resolved_name
             else:
                 yield from self._resolve_var_predecessors(fname, key)
-

@@ -47,3 +47,11 @@ def test_cache_invalidation():
     assert composer.a() == 1
     composer = composer.update_parameters(a=2)
     assert composer.a() == 2
+
+
+def test_shared_cache():
+    c = Composer().update(foo=lambda x: x * 2, bar=lambda: 9).cache()
+    assert c.bar() == 9
+    assert c.update_parameters(x=2).foo() == 4
+    assert c.bar() == 9  # KeyError: 'x'
+    assert c.update_parameters(x=2).foo() == 4
