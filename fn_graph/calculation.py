@@ -42,7 +42,7 @@ def get_execution_instructions(composer, dag, outputs):
     ) - invalid_nodes
 
     log.debug("Invalid nodes %s", invalid_nodes)
-    log.debug("Retrived Nodes %s", must_be_retrieved)
+    log.debug("Retrieved Nodes %s", must_be_retrieved)
 
     execution_order = list(nx.topological_sort(dag))
     execution_instructions = []

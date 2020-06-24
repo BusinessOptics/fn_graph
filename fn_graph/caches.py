@@ -24,15 +24,16 @@ def hash_fn(composer, key, use_id=False):
         else composer._functions[key]
     )
 
-    log.debug(f"Fn Value %s: %s", key, value)
-
     if use_id:
+        log.debug(f"Fn Value on %s for value %s is ID", key, id(value))
         return id(value)
 
     if callable(value):
+        log.debug("Fn Value on %s for value %r is callable", key, value)
         buffer = fn_value(value).encode("utf-8")
         return hashlib.sha256(buffer).digest()
     else:
+        log.debug("Fn Value on %s for value %r is not callable", key, value)
         buffer = BytesIO()
         pickle.dump(value, buffer)
         return hashlib.sha256(buffer.getvalue()).digest()
@@ -145,17 +146,23 @@ class DevelopmentCache(NullCache):
         if not exists:
             return False
 
-        current_hash = hash_fn(composer, key)
+        current_hash = hash_fn(composer, key, False)
         with open(fn_hash_path, "rb") as f:
             previous_hash = f.read()
 
         if current_hash != previous_hash:
+
             log.debug(
-                "Function change detected in development cache '%s' for key '%s'",
+                "Hash difference in cache '%s' for key '%s' is current %r vs previous %r",
                 self.name,
                 key,
+                current_hash,
+                previous_hash,
             )
+
             return False
+
+        log.debug("Valid development cache '%s' for key '%s'", self.name, key)
 
         return True
 
