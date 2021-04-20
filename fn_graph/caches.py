@@ -126,10 +126,14 @@ class DevelopmentCache(NullCache):
             cache_dir = ".fn_graph_cache"
 
         self.cache_dir = Path(cache_dir)
-        self.cache_root = self.cache_dir / name
         self.cache_root.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def cache_root(self):
+        return self.cache_dir / self.name
+
     def valid(self, composer, key):
+        self.cache_root.mkdir(parents=True, exist_ok=True)
         pickle_file_path = self.cache_root / f"{key}.data"
         info_file_path = self.cache_root / f"{key}.info.json"
         fn_hash_path = self.cache_root / f"{key}.fn.hash"
@@ -167,8 +171,9 @@ class DevelopmentCache(NullCache):
         return True
 
     def get(self, composer, key):
-        log.debug("Retrieving from development cache '%s' for key '%s'", self.name, key)
 
+        log.debug("Retrieving from development cache '%s' for key '%s'", self.name, key)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
         pickle_file_path = self.cache_root / f"{key}.data"
         info_file_path = self.cache_root / f"{key}.info.json"
 
@@ -190,6 +195,7 @@ class DevelopmentCache(NullCache):
     def set(self, composer, key, value):
 
         log.debug("Writing to development cache '%s' for key '%s'", self.name, key)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
         pickle_file_path = self.cache_root / f"{key}.data"
         info_file_path = self.cache_root / f"{key}.info.json"
         fn_hash_path = self.cache_root / f"{key}.fn.hash"
@@ -223,6 +229,7 @@ class DevelopmentCache(NullCache):
 
     def invalidate(self, composer, key):
         log.debug("Invalidation in development cache '%s' for key '%s'", self.name, key)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
         paths = [
             self.cache_root / f"{key}.data",
             self.cache_root / f"{key}.fn.hash",
