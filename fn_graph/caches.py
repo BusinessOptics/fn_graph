@@ -1,307 +1,296 @@
-import sys
-import traceback
-from collections import Counter
-from enum import Enum
-from functools import reduce
-from inspect import Parameter, signature
+import hashlib
+import inspect
+import json
+import pandas as pd
+import pickle
+from datetime import datetime
+from io import BytesIO
 from logging import getLogger
+from pathlib import Path
+from typing import Union, Dict
 
-import networkx as nx
-from littleutils import ensure_list_if_string
 
+PathorString = Union[str, Path]
 log = getLogger(__name__)
 
 
-class NodeInstruction(Enum):
-    CALCULATE = 1
-    RETRIEVE = 2
-    IGNORE = 3
+def fn_value(fn):
+    if getattr(fn, "_is_fn_graph_link", False):
+        return ",".join(inspect.signature(fn).parameters.keys())
+    else:
+        return inspect.getsource(fn)
 
 
-def get_execution_instructions(composer, dag, outputs):
-
-    direct_invalid_nodes = {
-        node for node in dag if not composer._cache.valid(composer, node)
-    }
-
-    invalid_nodes = (
-        reduce(
-            lambda a, b: a | b,
-            [nx.descendants(dag, node) for node in direct_invalid_nodes] + [set()],
-        )
-        | direct_invalid_nodes
+def hash_fn(composer, key, use_id=False):
+    value = (
+        composer._parameters[key][1]
+        if key in composer._parameters
+        else composer._functions[key]
     )
 
-    must_be_retrieved = (
-        {
-            node
-            for node in dag.nodes()
-            if any(succ in invalid_nodes for succ in dag.successors(node))
-        }
-        | set(outputs)
-    ) - invalid_nodes
+    if use_id:
+        log.debug(f"Fn Value on %s for value %s is ID", key, id(value))
+        return id(value)
 
-    log.debug("Invalid nodes %s", invalid_nodes)
-    log.debug("Retrieved Nodes %s", must_be_retrieved)
+    if callable(value):
+        log.debug("Fn Value on %s for value %r is callable", key, value)
+        buffer = fn_value(value).encode("utf-8")
+        return hashlib.sha256(buffer).digest()
+    else:
+        log.debug("Fn Value on %s for value %r is not callable", key, value)
+        buffer = BytesIO()
+        pickle.dump(value, buffer)
+        return hashlib.sha256(buffer.getvalue()).digest()
 
-    execution_order = list(nx.topological_sort(dag))
-    execution_instructions = []
-    for node in execution_order:
-        log.debug(node)
-        if composer._cache.__class__.__name__ == 'FuncOuputCache':
-            if composer._parameters['Funcoutput'][1] == 'save':
-                node_instruction = NodeInstruction.CALCULATE
-            elif composer._parameters['Funcoutput'][1] == 'load':
-                node_instruction = NodeInstruction.RETRIEVE
-        elif node in invalid_nodes:
-            node_instruction = NodeInstruction.CALCULATE
-        elif node in must_be_retrieved:
-            node_instruction = NodeInstruction.RETRIEVE
+
+class NullCache:
+    """
+    Performs no caching.
+
+    Used as a base class for other caches to indicate that they all have the same signature.
+    """
+
+    def valid(self, composer, key):
+        return False
+
+    def get(self, composer, key):
+        pass
+
+    def set(self, composer, key, value):
+        pass
+
+    def invalidate(self, composer, key):
+        pass
+
+
+class SimpleCache(NullCache):
+    """
+    Stores results in memory, performs no automatic invalidation.
+
+    Set hash_parameters=False to only check the object identities of parameters
+    when checking cache validity. This is slightly less robust to buggy usage
+    but is much faster for big parameter objects.
+
+    DO NOT USE THIS IN DEVELOPMENT OR A NOTEBOOK!
+    """
+
+    def __init__(self, hash_parameters=False):
+        self.cache = {}
+        self.hashes = {}
+        self.hash_parameters = hash_parameters
+
+    def _hash(self, composer, key):
+        return hash_fn(composer, key, use_id=not self.hash_parameters)
+
+    def valid(self, composer, key):
+        log.debug("Length %s", len(composer._functions))
+        if key in self.hashes:
+            current_hash = self._hash(composer, key)
+            stored_hash = self.hashes[key]
+            matches = current_hash == stored_hash
+            log.debug(f"hash test {key} {matches}: {current_hash} {stored_hash}")
+            return matches
         else:
-            node_instruction = NodeInstruction.IGNORE
-        execution_instructions.append((node, node_instruction))
+            log.debug(f"cache test {key} {key in self.cache}")
+            return key in self.cache
 
-    return execution_instructions
+    def get(self, composer, key):
+        return self.cache[key]
 
+    def set(self, composer, key, value):
+        self.cache[key] = value
+        if key in composer.parameters():
+            self.hashes[key] = self._hash(composer, key)
 
-def maintain_cache_consistency(composer):
-    dag = composer.dag()
+    def invalidate(self, composer, key):
 
-    direct_invalid_nodes = {
-        node
-        for node in composer._functions
-        if node in dag and not composer._cache.valid(composer, node)
-    }
-    log.debug("Direct invalid nodes %s", direct_invalid_nodes)
+        if key in self.cache:
+            del self.cache[key]
 
-    # If a node is invalidate all it's descendents must be made invalid
-    indirect_invalid_nodes = (
-        reduce(
-            lambda a, b: a | b,
-            [nx.descendants(dag, node) for node in direct_invalid_nodes] + [set()],
-        )
-    ) - direct_invalid_nodes
-    log.debug("Indirect invalid nodes %s", indirect_invalid_nodes)
-
-    for node in indirect_invalid_nodes:
-        composer._cache.invalidate(composer, node)
+        if key in self.hashes:
+            del self.hashes[key]
 
 
-def coalesce_argument_names(function, predecessor_results):
-    sig = signature(function)
-
-    positional_names = []
-    args_name = None
-    keyword_names = []
-    kwargs_name = None
-
-    for key, parameter in sig.parameters.items():
-        if parameter.kind in (
-            parameter.KEYWORD_ONLY,
-            parameter.POSITIONAL_OR_KEYWORD,
-            parameter.POSITIONAL_ONLY,
-        ):
-            if (
-                parameter.default is not Parameter.empty
-                and key not in predecessor_results
-            ):
-                continue
-
-            if args_name is None:
-                positional_names.append(key)
-            else:
-                keyword_names.append(key)
-        elif parameter.kind == parameter.VAR_POSITIONAL:
-            args_name = key
-        elif parameter.kind == parameter.VAR_KEYWORD:
-            kwargs_name = key
-
-    return positional_names, args_name, keyword_names, kwargs_name
-
-
-def coalesce_arguments(function, predecessor_results):
-    positional_names, args_name, keyword_names, kwargs_name = coalesce_argument_names(
-        function, predecessor_results
-    )
-
-    positional = [predecessor_results.pop(name) for name in positional_names]
-    args = [
-        predecessor_results.pop(name)
-        for name in list(predecessor_results.keys())
-        if name.startswith(args_name)
-    ]
-    keywords = {name: predecessor_results.pop(name) for name in keyword_names}
-    kwargs = {
-        name: predecessor_results.pop(name)
-        for name in list(predecessor_results)
-        if name.startswith(kwargs_name)
-    }
-
-    assert len(predecessor_results) == 0
-
-    return positional, args, keywords, kwargs
-
-
-def calculate_collect_exceptions(
-    composer,
-    outputs,
-    perform_checks=True,
-    intermediates=False,
-    progress_callback=None,
-    raise_immediately=False,
-):
+class DevelopmentCache(NullCache):
     """
-    Executes the required parts of the function graph to product results
-    for the given outputs.
+    Store cache on disk, analyses the coe for changes and performs automatic
+    invalidation.
 
-    Args:
-        composer: The composer to calculate
-        outputs: list of the names of the functions to calculate
-        perform_checks: if true error checks are performed before calculation
-        intermediates: if true the results of all functions calculated will be returned
-        progress_callback: a callback that is called as the calculation progresses,\
-                this be of the form `callback(event_type, details)`
+    This is only for use during development! DO NOT USE THIS IN PRODUCTION!
 
-    Returns:
-        Tuple: Tuple of (results, exception_info), results is a dictionary of results keyed by 
-               function name, exception_info (etype, evalue, etraceback, node) is the information 
-               about the exception if there was any.
+    The analysis of code changes is limited, it assumes that all functions are
+    pure, and tht there have been no important changes in the outside environment,
+    like a file that has been changed,
     """
-    outputs = ensure_list_if_string(outputs)
 
-    progress_callback = progress_callback or (lambda *args, **kwargs: None)
+    def __init__(self, name, cache_dir):
+        self.name = name
 
-    progress_callback("start_calculation", dict(outputs=outputs))
+        if cache_dir is None:
+            cache_dir = ".fn_graph_cache"
 
-    if perform_checks:
-        try:
-            for name in outputs:
-                if name not in composer._functions:
-                    raise Exception(
-                        f"'{name}' is not a composed function in this {composer.__class__.__name__} object."
-                    )
+        self.cache_dir = Path(cache_dir)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
 
-            for error in composer.check(outputs):
-                raise Exception(error)
-        except:
-            if raise_immediately:
-                raise
-            else:
-                etype, evalue, etraceback = sys.exc_info()
+    @property
+    def cache_root(self):
+        return self.cache_dir / self.name
 
-                return {}, (etype, evalue, etraceback, None)
+    def valid(self, composer, key):
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+        pickle_file_path = self.cache_root / f"{key}.data"
+        info_file_path = self.cache_root / f"{key}.info.json"
+        fn_hash_path = self.cache_root / f"{key}.fn.hash"
 
-    maintain_cache_consistency(composer)
+        exists = pickle_file_path.exists() and info_file_path.exists()
 
-    # Limit to only the functions we care about
-    dag = composer.ancestor_dag(outputs)
-
-    if intermediates:
-        outputs = dag.nodes()
-
-    execution_instructions = get_execution_instructions(composer, dag, outputs)
-    log.debug(execution_instructions)
-
-    # Results store
-    results = {}
-
-    # Number of time a functions results still needs to be accessed
-    remaining_usage_counts = Counter(pred for pred, _ in dag.edges())
-    progress_callback(
-        "prepared_calculation",
-        dict(execution_instructions=execution_instructions, execution_graph=dag),
-    )
-    log.debug("Starting execution")
-    for node, instruction in execution_instructions:
-        progress_callback(
-            "start_step", dict(name=node, execution_instruction=instruction)
+        log.debug(
+            "Checking development cache '%s' for key '%s': exists = %s",
+            self.name,
+            key,
+            exists,
         )
-        try:
-            predecessors = list(composer._resolve_predecessors(node))
 
-            if instruction == NodeInstruction.IGNORE:
-                log.debug("Ignoring function '%s'", node)
+        if not exists:
+            return False
 
-            elif instruction == NodeInstruction.RETRIEVE:
-                log.debug("Retrieving function '%s'", node)
-                try:
-                    progress_callback("start_cache_retrieval", dict(name=node))
-                    results[node] = composer._cache.get(composer, node)
-                finally:
-                    progress_callback("end_cache_retrieval", dict(name=node))
-            else:
-                log.debug("Calculating function '%s'", node)
-                function = composer._functions[node]
+        current_hash = hash_fn(composer, key, False)
+        with open(fn_hash_path, "rb") as f:
+            previous_hash = f.read()
 
-                # Pull up arguments
-                predecessor_results = {
-                    parameter: results[pred] for parameter, pred in predecessors
-                }
-                positional, args, keywords, kwargs = coalesce_arguments(
-                    function, predecessor_results
-                )
+        if current_hash != previous_hash:
 
-                try:
-                    progress_callback("start_function", dict(name=node))
-                    result = function(*positional, *args, **keywords, **kwargs)
-                except Exception as e:
-                    if raise_immediately:
-                        raise
-                    else:
-                        etype, evalue, etraceback = sys.exc_info()
-
-                        return results, (etype, evalue, etraceback, node)
-                finally:
-                    progress_callback("end_function", dict(name=node))
-
-                results[node] = result
-
-                try:
-                    progress_callback("start_cache_store", dict(name=node))
-                    composer._cache.set(composer, node, result)
-                finally:
-                    progress_callback("end_cache_store", dict(name=node))
-
-            # Eject results from memory once the are not needed
-            remaining_usage_counts.subtract([pred for _, pred in predecessors])
-            ready_to_eject = [
-                key
-                for key, value in remaining_usage_counts.items()
-                if value == 0 and key not in outputs
-            ]
-            for key in ready_to_eject:
-                assert key not in outputs
-                remaining_usage_counts.pop(key)
-                results.pop(key, "not_found")
-        finally:
-            progress_callback(
-                "end_step",
-                dict(
-                    name=node,
-                    execution_instruction=instruction,
-                    result=results.get(node),
-                ),
+            log.debug(
+                "Hash difference in cache '%s' for key '%s' is current %r vs previous %r",
+                self.name,
+                key,
+                current_hash,
+                previous_hash,
             )
 
-    # We should just be left with the results
-    return results, None
+            return False
+
+        log.debug("Valid development cache '%s' for key '%s'", self.name, key)
+
+        return True
+
+    def get(self, composer, key):
+
+        log.debug("Retrieving from development cache '%s' for key '%s'", self.name, key)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+        pickle_file_path = self.cache_root / f"{key}.data"
+        info_file_path = self.cache_root / f"{key}.info.json"
+
+        with open(info_file_path, "r") as f:
+            information = json.load(f)
+
+        format = information["format"]
+
+        with open(pickle_file_path, "rb") as f:
+            if format == "pickle":
+                return pickle.load(f)
+            elif format == "pandas-parquet":
+                return pd.read_parquet(f)
+            else:
+                raise Exception(f"Unknown caching fn_graph format: {format}")
+
+    def set(self, composer, key, value):
+
+        log.debug("Writing to development cache '%s' for key '%s'", self.name, key)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+        pickle_file_path = self.cache_root / f"{key}.data"
+        info_file_path = self.cache_root / f"{key}.info.json"
+        fn_hash_path = self.cache_root / f"{key}.fn.hash"
+
+        # This is a low-fi way to checK the type without adding requirements
+        # I am concerned it is fragile
+        if str(type(value)) == "<class 'pandas.core.frame.DataFrame'>":
+            format = "pandas-parquet"
+        else:
+            format = "pickle"
+
+        saved = False
+        if format == "pandas-parquet":
+            try:
+                with open(pickle_file_path, "wb") as f:
+                    value.to_parquet(f)
+                saved = True
+            except:
+                saved = False
+
+        if not saved:
+            format = "pickle"
+            with open(pickle_file_path, "wb") as f:
+                pickle.dump(value, f)
+
+        with open(fn_hash_path, "wb") as f:
+            f.write(hash_fn(composer, key))
+
+        with open(info_file_path, "w") as f:
+            json.dump({"format": format}, f)
+
+    def invalidate(self, composer, key):
+        log.debug("Invalidation in development cache '%s' for key '%s'", self.name, key)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+        paths = [
+            self.cache_root / f"{key}.data",
+            self.cache_root / f"{key}.fn.hash",
+            self.cache_root / f"{key}.info.json",
+        ]
+
+        for path in paths:
+            if path.exists():
+                path.unlink()
 
 
-def calculate(*args, **kwargs):
+class FuncOuputCache(NullCache):
     """
-    Executes the required parts of the function graph to product results
-    for the given outputs.
-
-    Args:
-        composer: The composer to calculate
-        outputs: list of the names of the functions to calculate
-        perform_checks: if true error checks are performed before calculation
-        intermediates: if true the results of all functions calculated will be returned
-        progress_callback: a callback that is called as the calculation progresses,\
-                this be of the form `callback(event_type, details)`
-
-    Returns:
-        Dictionary: Dictionary of results keyed by function name
+    Cache functionality to store all function outputs of a composer.
     """
-    results, _ = calculate_collect_exceptions(*args, raise_immediately=True, **kwargs)
-    return results
+
+    def __init__(self, distributor):
+        self.distributor = distributor
+
+        self.init_date = datetime.today().strftime('%Y-%m-%d')
+        self.cache_dir = Path(self.init_date)
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def cache_root(self):
+        return self.cache_dir
+
+    def get(self, composer, key):
+        if self.init_date != datetime.today().strftime('%Y-%m-%d'):
+            log.warn("The function output cache was created on a different date")
+        log.debug(f"Retrieving function output {self.cache_dir / self.distributor / key}")
+        data_folder_path = self.cache_dir / self.distributor / key
+        info_file_path = data_folder_path / f"{key}.info.json"
+        with open(info_file_path) as json_file:
+            params = json.load(json_file)
+        file_path = (data_folder_path / key).with_suffix('.parquet')
+        try:
+            if params['format'] ==  "<class 'pandas.core.series.Series'>":
+                return pd.read_parquet(file_path).iloc[:, 0]
+            elif params['format'] ==  "<class 'pandas.core.frame.DataFrame'>":
+                return pd.read_parquet(file_path)
+        except:
+            raise Exception(f"Function output data not found: {key}")
+
+    def set(self, composer, key, value):
+        params = {}
+        log.debug(f"Saving function output {self.cache_dir / self.distributor / key}")
+        data_folder_path = self.cache_dir / self.distributor / key
+        data_folder_path.mkdir(parents=True, exist_ok=True)
+        info_file_path = data_folder_path / f"{key}.info.json"
+        file_path = (data_folder_path / key).with_suffix('.parquet')
+        params["format"] = str(type(value))
+        if type(value) == pd.core.frame.DataFrame:
+            #parquet must have string column names
+            value.columns = value.columns.map(str)
+            value.to_parquet(file_path)
+        elif type(value) == pd.core.series.Series:
+            value.to_frame().to_parquet(file_path)
+        else:
+            raise Exception(f'Format not supported for {key}')
+        with open(info_file_path, "w") as f:
+            json.dump(params, f)
