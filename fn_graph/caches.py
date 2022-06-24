@@ -6,12 +6,22 @@ import pickle
 from datetime import datetime
 from io import BytesIO
 from logging import getLogger
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Union, Dict
 
 
 PathorString = Union[str, Path]
 log = getLogger(__name__)
+
+
+def input_to_file(key, value, fn):
+    if isinstance(value, (int, float, pd.Timestamp, PurePath)):
+        value = str(value)
+    elif isinstance(value, (set, list)):
+        if type(value) == set:
+            value = list(value)
+    with open(fn, "w") as f:
+        json.dump({key: value}, f)
 
 
 def fn_value(fn):
@@ -283,12 +293,12 @@ class FuncOuputCache(NullCache):
         info_file_path = data_folder_path / f"{key}.info.json"
         with open(info_file_path) as json_file:
             params = json.load(json_file)
-        file_path = (data_folder_path / key).with_suffix('.parquet')
+        file_path = (data_folder_path / key)
         try:
             if params['format'] ==  "<class 'pandas.core.series.Series'>":
-                return pd.read_parquet(file_path).iloc[:, 0]
+                return pd.read_parquet(file_path.with_suffix('.parquet')).iloc[:, 0]
             elif params['format'] ==  "<class 'pandas.core.frame.DataFrame'>":
-                return pd.read_parquet(file_path)
+                return pd.read_parquet(file_path.with_suffix('.parquet'))
         except:
             raise Exception(f"Function output data not found: {key}")
 
@@ -299,14 +309,18 @@ class FuncOuputCache(NullCache):
         data_folder_path = self.cache_dir / self.name / key
         data_folder_path.mkdir(parents=True, exist_ok=True)
         info_file_path = data_folder_path / f"{key}.info.json"
-        file_path = (data_folder_path / key).with_suffix('.parquet')
+        file_path = (data_folder_path / key)
+        print(f"{key} type is {str(type(value))}")
         params["format"] = str(type(value))
+        to_text_types = (int, float, str, set, list, pd.Timestamp, PurePath)
         if type(value) == pd.core.frame.DataFrame:
             #parquet must have string column names
             value.columns = value.columns.map(str)
-            value.to_parquet(file_path)
+            value.to_parquet(file_path.with_suffix('.parquet'))
         elif type(value) == pd.core.series.Series:
-            value.to_frame().to_parquet(file_path)
+            value.to_frame().to_parquet(file_path.with_suffix('.parquet'))
+        elif isinstance(value, to_text_types):
+            input_to_file(key, value, file_path.with_suffix('.json'))
         else:
             raise Exception(f'Format not supported for {key}')
         with open(info_file_path, "w") as f:
