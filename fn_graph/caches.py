@@ -299,6 +299,9 @@ class FuncOuputCache(NullCache):
                 return pd.read_parquet(file_path.with_suffix('.parquet')).iloc[:, 0]
             elif params['format'] ==  "<class 'pandas.core.frame.DataFrame'>":
                 return pd.read_parquet(file_path.with_suffix('.parquet'))
+            else:
+                with open(file_path, "rb") as f:
+                    return pickle.load(f)
         except:
             raise Exception(f"Function output data not found: {key}")
 
@@ -312,16 +315,17 @@ class FuncOuputCache(NullCache):
         file_path = (data_folder_path / key)
         print(f"{key} type is {str(type(value))}")
         params["format"] = str(type(value))
-        to_text_types = (int, float, str, set, list, pd.Timestamp, PurePath)
         if type(value) == pd.core.frame.DataFrame:
             #parquet must have string column names
             value.columns = value.columns.map(str)
             value.to_parquet(file_path.with_suffix('.parquet'))
         elif type(value) == pd.core.series.Series:
             value.to_frame().to_parquet(file_path.with_suffix('.parquet'))
-        elif isinstance(value, to_text_types):
-            input_to_file(key, value, file_path.with_suffix('.json'))
         else:
-            raise Exception(f'Format not supported for {key}')
+            try:
+                with open(file_path, "wb") as f:
+                    pickle.dump(value, f)
+            except:
+                raise Exception(f'Format not supported for {key}')
         with open(info_file_path, "w") as f:
             json.dump(params, f)
