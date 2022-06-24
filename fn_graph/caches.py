@@ -313,7 +313,6 @@ class FuncOuputCache(NullCache):
         data_folder_path.mkdir(parents=True, exist_ok=True)
         info_file_path = data_folder_path / f"{key}.info.json"
         file_path = (data_folder_path / key)
-        print(f"{key} type is {str(type(value))}")
         params["format"] = str(type(value))
         if type(value) == pd.core.frame.DataFrame:
             #parquet must have string column names
