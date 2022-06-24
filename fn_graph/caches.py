@@ -246,24 +246,40 @@ class DevelopmentCache(NullCache):
 class FuncOuputCache(NullCache):
     """
     Cache functionality to store all function outputs of a composer.
+
+    IMPORTANT:
+    For this to work the composer needs to set a paramater called funcoutput,
+    that can either be 'save' or 'load'. 
     """
 
-    def __init__(self, distributor):
-        self.distributor = distributor
-
-        self.init_date = datetime.today().strftime('%Y-%m-%d')
-        self.cache_dir = Path(self.init_date)
-        self.cache_root.mkdir(parents=True, exist_ok=True)
-
+    def __init__(self, name):
+        self.name = name
+        self.df = '%Y-%m-%d'
+        self.init_date = datetime.today().strftime(self.df)
+        self.cache_parent = Path('data/func_out_cache')
+        self.cache_dir = self.cache_parent / Path(self.init_date)
+        
     @property
     def cache_root(self):
         return self.cache_dir
+    
+    @property
+    def latest_saved_date(self):
+        glob_date_pattern = '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        dates = [datetime.strptime(
+            x.name, self.df) for x in self.cache_parent.glob(glob_date_pattern
+                )]
+        if len(dates) > 0:
+            dates.sort()
+            return dates[-1].strftime(self.df)
+        else:
+            return None
 
     def get(self, composer, key):
-        if self.init_date != datetime.today().strftime('%Y-%m-%d'):
-            log.warn("The function output cache was created on a different date")
-        log.debug(f"Retrieving function output {self.cache_dir / self.distributor / key}")
-        data_folder_path = self.cache_dir / self.distributor / key
+        if self.latest_saved_date != datetime.today().strftime(self.df):
+            log.error("The function output cache was created on a different date")
+        log.debug(f"Retrieving function output {self.cache_dir / self.name / key}")
+        data_folder_path = self.cache_dir / self.name / key
         info_file_path = data_folder_path / f"{key}.info.json"
         with open(info_file_path) as json_file:
             params = json.load(json_file)
@@ -278,8 +294,9 @@ class FuncOuputCache(NullCache):
 
     def set(self, composer, key, value):
         params = {}
-        log.debug(f"Saving function output {self.cache_dir / self.distributor / key}")
-        data_folder_path = self.cache_dir / self.distributor / key
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+        log.debug(f"Saving function output {self.cache_dir / self.name / key}")
+        data_folder_path = self.cache_dir / self.name / key
         data_folder_path.mkdir(parents=True, exist_ok=True)
         info_file_path = data_folder_path / f"{key}.info.json"
         file_path = (data_folder_path / key).with_suffix('.parquet')

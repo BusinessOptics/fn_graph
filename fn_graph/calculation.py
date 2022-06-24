@@ -49,9 +49,9 @@ def get_execution_instructions(composer, dag, outputs):
     for node in execution_order:
         log.debug(node)
         if composer._cache.__class__.__name__ == 'FuncOuputCache':
-            if composer._parameters['Funcoutput'][1] == 'save':
+            if composer._parameters['funcoutput'][1] == 'save':
                 node_instruction = NodeInstruction.CALCULATE
-            elif composer._parameters['Funcoutput'][1] == 'load':
+            elif composer._parameters['funcoutput'][1] == 'load':
                 node_instruction = NodeInstruction.RETRIEVE
         elif node in invalid_nodes:
             node_instruction = NodeInstruction.CALCULATE
@@ -293,7 +293,7 @@ def calculate(*args, **kwargs):
     for the given outputs.
 
     Args:
-        composer: The composer to calculate
+        composer: The composer to 
         outputs: list of the names of the functions to calculate
         perform_checks: if true error checks are performed before calculation
         intermediates: if true the results of all functions calculated will be returned
