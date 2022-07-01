@@ -51,9 +51,9 @@ def get_execution_instructions(composer, dag, outputs):
         if composer._cache.__class__.__name__ == 'FuncOuputCache':
             if composer._parameters['funcoutput'][1] == 'save':
                 node_instruction = NodeInstruction.CALCULATE
-            elif composer._parameters['funcoutput'][1] == 'load':
-                node_instruction = NodeInstruction.RETRIEVE
-        elif node in invalid_nodes:
+                execution_instructions.append((node, node_instruction))
+                continue
+        if node in invalid_nodes:
             node_instruction = NodeInstruction.CALCULATE
         elif node in must_be_retrieved:
             node_instruction = NodeInstruction.RETRIEVE
