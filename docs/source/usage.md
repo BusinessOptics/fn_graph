@@ -3,7 +3,7 @@
 ## Building up logic
 
 That principle idea behind Fn Graph is to use the names of a functions arguments to find that
-functions dependencies, and hence wire up the graph.
+function's dependencies, and hence wire up the graph.
 
 There are multiple methods to add functions to the graph, all of them use the underlying
 `update` function. In the most direct form update takes keyword arguments, the keyword defines
@@ -43,7 +43,7 @@ composer = Composer().update(a=a, b=b, c=c)
 ```
 
 The issue with this is it leads to name shadowing, which some people don't like, and many linters
-will (rightly) complain about. An alternative that is reasonably terse and does not have the name
+will (rightly) complain about. A reasonably terse alternative that does not have the name
 shadowing problem is to use the prefix or suffix stripping versions of update.
 
 ```python
@@ -61,7 +61,7 @@ def get_c(a, b):
 composer = Composer().update_without_prefix("get_", get_a, get_b, get_c)
 ```
 
-Often you have static inputs into a graph, parameters. It is more convenient ot treat these differently rather than creating functions that just return the values, and use the `update_parameters` method.
+Often you have static inputs into a graph, parameters. It is more convenient to treat these differently rather than creating functions that just return the values, and use the `update_parameters` method.
 
 ```python
 from fn_graph import Composer
@@ -91,7 +91,7 @@ composer_c = composer_b.update_from(composer_a)
 
 ## Visualisation
 
-You can see the function graph using the `graphviz` method. In a notebook environment this will be rendered directly. In other environment you may want to use the view method.
+You can see the function graph using the `graphviz` method. In a notebook environment this will be rendered directly. In other environments you may use the view method.
 
 ```python
 # In a notebbook
@@ -103,14 +103,14 @@ composer.graphviz().view()
 
 ## Calculation
 
-The function graph can be calculated using the `calculate` method. It can calculate multiple results at once, and can return all the intermediate results. It returns a dictionary of the results
+The function graph can be calculated using the `calculate` method. It can calculate multiple results at once, and can return all the intermediate results. It returns a dictionary of the results.
 
 ```python
 composer.calculate(["a" ,"c"]) // {"a": 5, "c": 125}
 composer.calculate(["a" ,"c"], intermediates=True) // {"a": 5, "b": 25, "c": 125}
 ```
 
-You can als use the call function if you want only a single result.
+You can also use the call function if you want only a single result.
 
 ```python
 composer.call("c") // 125
@@ -131,11 +131,11 @@ cached_composer = composer.development_cache(__name__)
 ```
 
 If something has changed that requires the cache to be invalidated you can use the `cache_invalidate`
-or `cache_clear` methods. `cache_invalidate` takes the names of teh functions you wish to invalidate, it will ensure any follow on functions are invalidated. `cache_clear` will clear the cache.
+or `cache_clear` methods. `cache_invalidate` takes the names of the functions you wish to invalidate and ensures any follow on functions are invalidated. `cache_clear` will clear the cache.
 
 ## Namespaces
 
-When logic gets complex, or similar logic needs to be reused in different spaces in one composer it can useful to use namespaces. Namespaces create a hierarchy of named scopes. that limits what functions arguments resolve to. Namespaces are separated with the double underscore (`__`). Namespaces are constructed using the `update_namespaces` method. For example:
+Namespaces are useful when logic gets complex or similar logic needs to be reused in different spaces. Namespaces create a hierarchy of named scopes that limit to which functions arguments resolve. Namespaces are separated with the double underscore (`__`). Namespaces are constructed using the `update_namespaces` method. For example:
 
 ```python
 from fn_graph import Composer
@@ -169,21 +169,20 @@ Then the resulting graph would look like this:
 
 ![namespaces graphviz](namespaces.png)
 
-There are couple of things going on here.
+There are a few things going on here.
 
-1. You can see that function `c` resolves it's arguments within it;s namespace.
+1. You can see that function `c` resolves its arguments within its namespace.
 2. The `b` functions do not find a `data` function in their own namespace so they look to the parent namespace.
-3. The combined_result specifically names it's argunents to pull from the namespaces using the double-underscore (`__`).
+3. The combined_result specifically names its arguments to pull from the namespaces using the double-underscore (`__`).
 4. The parameters have been set differently in different namespaces (but could have been set the same by putting it in the top level namespace).
 
-These capabilities on their own allow you to construct (and reconstruct) very flexible logic. Sometimes though, given that arguments are resolved just by name it is useful to be able to create a link between one name and another. You can do this using the the `link` method. For example:
+These capabilities on their own allow you to construct (and reconstruct) very flexible logic. Sometimes though, given that arguments are resolved just by name, it is useful to be able to create a link between one name and another. You can do this using the the `link` method. For example:
 
 ```python
 def calculated_factor(data):
     return data / 2
 
 
-factor_calc = Composer()
 factoring = Composer().update(calculated_factor)
 
 linked_parent = (
