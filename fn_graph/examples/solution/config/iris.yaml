@@ -1,0 +1,61 @@
+pipeline:
+  run_id: iris_run_001
+  on_failure: finish_running   # keep going if a node fails
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+nodes:
+  # --- in-process ---
+  iris:
+    executor: memory
+  investigate_data:
+    executor: memory
+  training_target:
+    executor: memory
+  test_target:
+    executor: memory
+  confusion_matrix:
+    executor: memory
+
+  # --- docker ---
+  data:
+    executor: docker
+    image: fn_graph_worker_v2
+  preprocess_data:
+    executor: docker
+    image: fn_graph_worker_v2
+  model:
+    executor: docker
+    image: fn_graph_worker_v2
+    retry:
+      max_attempts: 3
+      delay_seconds: 5
+      backoff: exponential     # linear | exponential
+
+  # --- lambda ---
+  split_data:
+    executor: lambda
+    function_name: fn_graph_worker_lambda
+    region: us-east-1
+  training_features:
+    executor: lambda
+    function_name: fn_graph_worker_lambda
+    region: us-east-1
+  test_features:
+    executor: lambda
+    function_name: fn_graph_worker_lambda
+    region: us-east-1
+  predictions:
+    executor: lambda
+    function_name: fn_graph_worker_lambda
+    region: us-east-1
+  classification_metrics:
+    executor: lambda
+    function_name: fn_graph_worker_lambda
+    region: us-east-1
+
+  # --- default for any node not listed above ---
+  "*":
+    executor: memory

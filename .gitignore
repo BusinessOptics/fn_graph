@@ -144,4 +144,5 @@ Digraph.gv.pdf
 .fn_graph_cache
 
 # Sandbox files for developers
-sandbox.py
+sandbox.py.DS_Store
+fn_graph/.DS_Store

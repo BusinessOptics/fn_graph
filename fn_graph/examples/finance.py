@@ -1,35 +1,25 @@
 """
-In finance, the Sharpe ratio (also known as the Sharpe index, the Sharpe measure, 
-and the reward-to-variability ratio) measures the performance of an investment 
-(e.g., a security or portfolio) compared to a risk-free asset, after adjusting 
-for its risk. It is defined as the difference between the returns of the 
-investment and the risk-free return, divided by the standard deviation of the 
-investment (i.e., its volatility). It represents the additional amount of return 
-that an investor receives per unit of increase in risk.
+In finance, the Sharpe ratio measures the performance of an investment compared
+to a risk-free asset, after adjusting for its risk.
 
-This shows how to calculate a the Sharoe ratio for a small portfolio of shares. The
-share data us pulled from yahoo finance and the analysis is done in pandas. We assume 
-a risk free rate of zero.
+This shows how to calculate the Sharpe ratio for a small portfolio of shares.
 """
 
 from datetime import date
 from math import sqrt
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
-from fn_graph import Composer
 from pandas.plotting import register_matplotlib_converters
+
+from fn_graph.examples.solution.composer import PipelineComposer as Composer
 
 register_matplotlib_converters()
 plt.style.use("fivethirtyeight")
 
 
 def closing_prices(share_allocations, start_date, end_date):
-    """
-    The closing prices of our portfolio pulled with yfinance.
-    """
     data = yf.download(
         " ".join(share_allocations.keys()), start=start_date, end=end_date
     )
@@ -37,31 +27,20 @@ def closing_prices(share_allocations, start_date, end_date):
 
 
 def normalised_returns(closing_prices):
-    """
-    Normalise the returns as a ratio of the initial price.
-    """
     return closing_prices / closing_prices.iloc[0, :]
 
 
 def positions(normalised_returns, share_allocations, initial_total_position):
-    """
-    Our total positions ovr time given an initial allocation.
-    """
-
     allocations = pd.DataFrame(
         {
             symbol: normalised_returns[symbol] * allocation
             for symbol, allocation in share_allocations.items()
         }
     )
-
     return allocations * initial_total_position
 
 
 def total_position(positions):
-    """
-    The total value of out portfolio
-    """
     return positions.sum(axis=1)
 
 
@@ -70,23 +49,14 @@ def positions_plot(positions):
 
 
 def cumulative_return(total_position):
-    """
-    The cumulative return of our portfolio
-    """
-    return 100 * (total_position[-1] / total_position[0] - 1)
+    return 100 * (total_position.iloc[-1] / total_position.iloc[0] - 1)
 
 
 def daily_return(total_position):
-    """
-    The daily return of our portfolio
-    """
     return total_position.pct_change(1)
 
 
 def sharpe_ratio(daily_return):
-    """
-    The sharpe ratio of the portfolio assuming a zero risk free rate.
-    """
     return daily_return.mean() / daily_return.std()
 
 
@@ -116,5 +86,4 @@ composer = (
     .cache()
 )
 
-# Just for uniformity with the rest of the examples
 f = composer

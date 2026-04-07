@@ -1,0 +1,17 @@
+# Lambda container image — pushed to ECR, invoked by LambdaExecutor
+FROM public.ecr.aws/lambda/python:3.12
+
+# Install dependencies
+RUN pip install --no-cache-dir \
+    cloudpickle \
+    scikit-learn \
+    pandas \
+    numpy \
+    seaborn \
+    matplotlib \
+    networkx
+
+# Copy handler — node functions arrive at runtime via fn_source in event payload
+COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
+
+CMD ["lambda_handler.handler"]

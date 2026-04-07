@@ -1,0 +1,16 @@
+pipeline:
+  run_id: toy_lambda_001
+  on_failure: finish_running
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+nodes:
+  run_model:
+    executor: lambda
+    function_name: fn_graph_worker_lambda
+    region: us-east-1
+
+  "*":
+    executor: memory

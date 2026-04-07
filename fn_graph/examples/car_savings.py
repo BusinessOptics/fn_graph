@@ -1,12 +1,11 @@
 """
 A simple example showing basic functionality.
 """
-#%%
 from random import choice, random
 
 import pandas as pd
 import plotly.express as px
-from fn_graph import Composer
+from fn_graph.examples.solution.composer import PipelineComposer as Composer
 
 prices = [random() * 100_000 + 50000 for _ in range(10)]
 
@@ -18,7 +17,6 @@ def get_car_prices():
             price=prices,
         )
     )
-
     return df
 
 
